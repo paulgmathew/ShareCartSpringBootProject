@@ -6,6 +6,7 @@ import com.sharecart.sharecart.item.repository.ItemRepository;
 import com.sharecart.sharecart.shoppinglist.dto.CreateListRequest;
 import com.sharecart.sharecart.shoppinglist.dto.InviteRequest;
 import com.sharecart.sharecart.shoppinglist.dto.MemberResponse;
+import com.sharecart.sharecart.shoppinglist.dto.MyListResponse;
 import com.sharecart.sharecart.shoppinglist.dto.ShoppingListResponse;
 import com.sharecart.sharecart.shoppinglist.model.ListMember;
 import com.sharecart.sharecart.shoppinglist.model.ShoppingList;
@@ -14,7 +15,10 @@ import com.sharecart.sharecart.shoppinglist.repository.ShoppingListRepository;
 import com.sharecart.sharecart.shoppinglist.service.ShoppingListService;
 import com.sharecart.sharecart.user.model.User;
 import com.sharecart.sharecart.user.repository.UserRepository;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,12 +35,9 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
     @Override
     @Transactional
-    public ShoppingListResponse createList(CreateListRequest request) {
-        User owner = null;
-        if (request.ownerId() != null) {
-            owner = userRepository.findById(request.ownerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.ownerId()));
-        }
+    public ShoppingListResponse createList(CreateListRequest request, UUID ownerId) {
+        User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + ownerId));
 
         ShoppingList shoppingList = ShoppingList.builder()
                 .name(request.name())
@@ -45,17 +46,54 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         ShoppingList saved = shoppingListRepository.save(shoppingList);
 
-        // Automatically add the owner as an OWNER member
-        if (owner != null) {
-            ListMember ownerMember = ListMember.builder()
-                    .shoppingList(saved)
-                    .user(owner)
-                    .role("OWNER")
-                    .build();
-            listMemberRepository.save(ownerMember);
-        }
+        ListMember ownerMember = ListMember.builder()
+                .shoppingList(saved)
+                .user(owner)
+                .role("OWNER")
+                .build();
+        listMemberRepository.save(ownerMember);
 
         return toResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MyListResponse> getMyLists(UUID userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        Map<UUID, MyListResponse> lists = new LinkedHashMap<>();
+
+        for (ShoppingList list : shoppingListRepository.findByOwnerId(userId)) {
+            lists.put(list.getId(), new MyListResponse(
+                    list.getId(),
+                    list.getName(),
+                    list.getOwner() != null ? list.getOwner().getId() : null,
+                    list.getOwner() != null ? list.getOwner().getName() : null,
+                    "OWNER",
+                    list.getCreatedAt(),
+                    list.getUpdatedAt()
+            ));
+        }
+
+        for (ListMember member : listMemberRepository.findByUserId(userId)) {
+            ShoppingList list = member.getShoppingList();
+            String role = member.getRole() != null ? member.getRole() : "MEMBER";
+
+            lists.put(list.getId(), new MyListResponse(
+                    list.getId(),
+                    list.getName(),
+                    list.getOwner() != null ? list.getOwner().getId() : currentUser.getId(),
+                    list.getOwner() != null ? list.getOwner().getName() : currentUser.getName(),
+                    role,
+                    list.getCreatedAt(),
+                    list.getUpdatedAt()
+            ));
+        }
+
+        return lists.values().stream()
+                .sorted(Comparator.comparing(MyListResponse::updatedAt).reversed())
+                .toList();
     }
 
     @Override

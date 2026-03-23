@@ -10,5 +10,7 @@ public interface ListMemberRepository extends JpaRepository<ListMember, UUID> {
 
     List<ListMember> findByShoppingListId(UUID listId);
 
+    List<ListMember> findByUserId(UUID userId);
+
     Optional<ListMember> findByShoppingListIdAndUserId(UUID listId, UUID userId);
 }
