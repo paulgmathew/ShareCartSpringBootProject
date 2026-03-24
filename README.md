@@ -1,94 +1,230 @@
-# ShareCart Spring Boot Project
+# ShareCart Spring Boot Backend
 
-Backend service for the ShareCart mobile application.
+ShareCart is a Spring Boot REST API backend for a shared shopping list application.
+It provides JWT-based authentication, collaborative shopping lists, member invitations, and item management.
+
+## Overview
+
+Current capabilities:
+
+- Register a user
+- Log in and receive a JWT token
+- Load all lists for the logged-in user
+- Create shopping lists
+- Fetch list details by id
+- Invite members to a list
+- Add items to a list
+- Update items
+- Delete items
 
 ## Tech Stack
 
-- Java 25
+- Java 21
 - Spring Boot 4.0.4
-- Spring Web
+- Spring Web MVC
 - Spring Data JPA
-- PostgreSQL (local development)
+- Spring Validation
+- Spring Security
+- PostgreSQL
 - Hibernate 7
 - Lombok
+- JJWT 0.12.3
 
 ## Architecture
 
-The project follows a clean layered architecture:
+The project follows a layered architecture:
 
-- Controller -> exposes REST APIs
+- Controller -> REST API layer
 - Service -> business logic
-- Repository -> data access with Spring Data JPA
-- DB -> PostgreSQL database
+- Repository -> data access
+- Database -> PostgreSQL
+
+Main modules:
+
+- `auth`
+- `shoppinglist`
+- `item`
+- `user`
+- `common.exception`
+- `common.security`
 
 ## Project Structure
 
-src/main/java/com/sharecart/sharecart
+```text
+src/main/java/com/sharecart/sharecart/
+  auth/
+    controller/
+    dto/
+    service/
+  item/
+    controller/
+    dto/
+    model/
+    repository/
+    service/
+  shoppinglist/
+    controller/
+    dto/
+    model/
+    repository/
+    service/
+  user/
+    model/
+    repository/
+  common/
+    exception/
+    security/
+```
 
-- cart/controller -> REST controllers
-- cart/service -> service contracts
-- cart/service/impl -> service implementations
-- cart/repository -> repository interfaces
-- cart/model -> JPA entities
-- cart/dto -> request/response models
-- common/exception -> centralized exception handling
+## Local Setup
 
-## Database Setup (PostgreSQL)
+Make sure PostgreSQL is running locally on port `5432`.
 
-Make sure PostgreSQL is installed and running locally on port **5432**.
-
-Create the database before running the application:
+Create the database:
 
 ```sql
 CREATE DATABASE sharecartdb;
 ```
 
-The application connects using the following default credentials (see `src/main/resources/application.properties`):
+Default datasource settings are configured in `src/main/resources/application.properties`.
 
-| Property | Value |
-|---|---|
-| Host | localhost |
-| Port | 5432 |
-| Database | sharecartdb |
-| Username | postgres |
-| Password | docker1 |
+Local development values:
 
-To customise, update the values in `application.properties`:
+- Host: `localhost`
+- Port: `5432`
+- Database: `sharecartdb`
+- Username: `postgres`
+- Password: `docker1`
 
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/sharecartdb
-spring.datasource.username=postgres
-spring.datasource.password=docker1
-```
+JWT settings:
+
+- `app.jwt.secret`
+- `app.jwt.expiration-ms=86400000`
 
 ## Run Locally
 
-Use Maven wrapper:
+Start the application:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-## Default URLs
+Build the project:
 
-- Application: http://localhost:8080
+```bash
+./mvnw clean package
+```
 
-## API Endpoints
+Application URL:
 
-Base path: `/api/v1`
+- `http://localhost:8080`
 
-### Items
+Base API path:
 
-- `GET    /api/v1/items`
-- `GET    /api/v1/items/{id}`
-- `POST   /api/v1/items`
-- `PUT    /api/v1/items/{id}`
-- `DELETE /api/v1/items/{id}`
+- `/api/v1`
+
+## Authentication
+
+Public endpoints:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+
+All other endpoints require this header:
+
+```text
+Authorization: Bearer <token>
+```
+
+Typical flow:
+
+1. Register or log in
+2. Store the returned JWT token
+3. Send the token on every protected request
+4. Use `GET /api/v1/lists/me` as the landing-page endpoint
+
+## Quick Start API Examples
+
+### Register
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "paul@example.com",
+    "password": "password123",
+    "name": "Paul"
+  }'
+```
+
+### Login
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "paul@example.com",
+    "password": "password123"
+  }'
+```
+
+### Load My Lists
+
+```bash
+curl http://localhost:8080/api/v1/lists/me \
+  -H "Authorization: Bearer <token>"
+```
+
+### Create List
+
+```bash
+curl -X POST http://localhost:8080/api/v1/lists \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "name": "Weekend Groceries"
+  }'
+```
+
+## Current API Endpoints
+
+### Auth
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
 
 ### Shopping Lists
 
-- `GET    /api/v1/shopping-lists`
-- `GET    /api/v1/shopping-lists/{id}`
-- `POST   /api/v1/shopping-lists`
-- `PUT    /api/v1/shopping-lists/{id}`
-- `DELETE /api/v1/shopping-lists/{id}`
+- `GET /api/v1/lists/me`
+- `POST /api/v1/lists`
+- `GET /api/v1/lists/{id}`
+- `POST /api/v1/lists/{id}/invite`
+
+### Items
+
+- `POST /api/v1/lists/{listId}/items`
+- `PUT /api/v1/items/{id}`
+- `DELETE /api/v1/items/{id}`
+
+## Important API Notes
+
+- `POST /api/v1/lists` derives the owner from the authenticated JWT user
+- Clients must not send `ownerId` when creating a list
+- `GET /api/v1/lists/me` is the correct home-screen endpoint
+- `PUT /api/v1/items/{id}` behaves like a partial update even though it uses PUT
+
+## Documentation
+
+Detailed docs:
+
+- `docs/jwt-auth-implementation.md`
+- `docs/flutter-backend-integration.md`
+- `docs/flutter-recent-backend-changes.md`
+- `docs/api-input-output-reference.md`
+- `docs/liquibase-project-guide.md`
+
+## Development Notes
+
+- The project currently uses `spring.jpa.hibernate.ddl-auto=update` for local schema updates
+- Replace the JWT secret before any production deployment
+- Local datasource credentials in `application.properties` are for development only
