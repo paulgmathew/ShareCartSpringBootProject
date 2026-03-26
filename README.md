@@ -222,6 +222,7 @@ Detailed docs:
 - `docs/flutter-recent-backend-changes.md`
 - `docs/api-input-output-reference.md`
 - `docs/liquibase-project-guide.md`
+- `docs/render-deployment-troubleshooting.md`
 
 ## Development Notes
 
