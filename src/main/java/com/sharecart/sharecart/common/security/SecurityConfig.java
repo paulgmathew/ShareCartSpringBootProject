@@ -30,6 +30,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // auth endpoints open to everyone
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                    // allow WebSocket handshake endpoint
+                    .requestMatchers("/ws/**").permitAll()
                         // all other endpoints require a valid JWT
                         .anyRequest().authenticated()
                 )

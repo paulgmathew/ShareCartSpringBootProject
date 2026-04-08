@@ -223,6 +223,8 @@ Detailed docs:
 - `docs/api-input-output-reference.md`
 - `docs/liquibase-project-guide.md`
 - `docs/render-deployment-troubleshooting.md`
+- `docs/realtime-websocket-sync.md`
+- `docs/realtime-phase2-change-log.md`
 
 ## Development Notes
 

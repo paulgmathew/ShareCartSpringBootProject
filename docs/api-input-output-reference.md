@@ -33,6 +33,47 @@ Authorization: Bearer <token>
 
 ---
 
+## Realtime Channel (WebSocket + STOMP)
+
+WebSocket endpoint:
+
+- ws://<host>/ws
+
+STOMP CONNECT header (required):
+
+- Authorization: Bearer <token>
+
+Topic pattern:
+
+- /topic/lists/{listId}
+
+Subscription rule:
+
+- user must be owner/member of {listId}; otherwise subscription is rejected
+
+Event payload model:
+
+```json
+{
+  "eventType": "ITEM_ADDED | ITEM_UPDATED | ITEM_DELETED",
+  "listId": "uuid",
+  "item": {
+    "id": "uuid",
+    "listId": "uuid",
+    "name": "string",
+    "quantity": "string or null",
+    "isCompleted": "boolean",
+    "category": "string or null",
+    "createdBy": "uuid or null",
+    "createdAt": "ISO local datetime",
+    "updatedAt": "ISO local datetime"
+  },
+  "occurredAt": "ISO instant"
+}
+```
+
+---
+
 ## 1) Register
 
 Endpoint:
