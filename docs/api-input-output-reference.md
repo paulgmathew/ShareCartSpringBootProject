@@ -524,6 +524,128 @@ Common errors:
 
 ---
 
+## 10) Generate Invite Link
+
+Endpoint:
+
+POST /api/v1/lists/{listId}/invite-link
+
+Auth:
+
+Yes
+
+Path params:
+
+1. listId: UUID
+
+Request body:
+
+None
+
+Important behavior:
+
+1. Only the list OWNER can generate an invite link
+2. Link expires after 24 hours
+3. Base URL configured via APP_INVITE_BASE_URL env var (default: https://sharecart.app/invite)
+
+Success:
+
+1. Status: 200 OK
+2. Body:
+
+```json
+{
+  "inviteUrl": "https://sharecart.app/invite/abc123def456..."
+}
+```
+
+Common errors:
+
+1. 403 Forbidden (caller is not the list owner, or missing/invalid token)
+2. 404 Not Found (list not found)
+
+---
+
+## 11) Accept Invite Link
+
+Endpoint:
+
+POST /api/v1/invites/{token}/accept
+
+Auth:
+
+Yes
+
+Path params:
+
+1. token: String (invite token from the link)
+
+Request body:
+
+None
+
+Success:
+
+1. Status: 200 OK
+2. Body:
+
+```json
+{
+  "listId": "22222222-2222-2222-2222-222222222222",
+  "message": "Joined successfully"
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (invite link has expired)
+2. 403 Forbidden (missing/invalid/expired JWT token)
+3. 404 Not Found (invite token not found or invalid)
+4. 409 Conflict (user is already a member of this list)
+
+---
+
+## 12) Preview Invite Link
+
+Endpoint:
+
+GET /api/v1/invites/{token}
+
+Auth:
+
+No
+
+Path params:
+
+1. token: String (invite token from the link)
+
+Request body:
+
+None
+
+Important behavior:
+
+1. Public endpoint — no JWT required
+2. Use this to show the list name and owner before the user decides to accept
+
+Success:
+
+1. Status: 200 OK
+2. Body:
+
+```json
+{
+  "listName": "Weekend Groceries",
+  "ownerName": "Paul"
+}
+```
+
+Common errors:
+
+1. 404 Not Found (invite token not found or invalid)
+
+---
+
 ## Shared Response Models
 
 ### AuthResponse
@@ -595,6 +717,32 @@ Common errors:
 }
 ```
 
+### GenerateInviteLinkResponse
+
+```json
+{
+  "inviteUrl": "string"
+}
+```
+
+### AcceptInviteResponse
+
+```json
+{
+  "listId": "uuid",
+  "message": "string"
+}
+```
+
+### InvitePreviewResponse
+
+```json
+{
+  "listName": "string",
+  "ownerName": "string or null"
+}
+```
+
 ---
 
 ## Standard Error Body (when handled by GlobalExceptionHandler)
@@ -613,8 +761,8 @@ Common errors:
 
 Notes:
 
-1. 400: validation failures include details map
+1. 400: validation failures include details map; also returned for expired invite links
 2. 401: invalid credentials on login
 3. 404: resource not found
-4. 409: business conflict (duplicate invite, duplicate email)
-5. 403 on protected routes can come directly from Spring Security when token is missing/invalid
+4. 409: business conflict (duplicate invite, duplicate email, already list member)
+5. 403 on protected routes can come directly from Spring Security when token is missing/invalid; also returned when caller lacks permission (e.g. non-owner generating invite link)

@@ -32,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                     // allow WebSocket handshake endpoint
                     .requestMatchers("/ws/**").permitAll()
+                        // invite preview is public (no auth needed to peek at an invite)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/invites/*").permitAll()
                         // all other endpoints require a valid JWT
                         .anyRequest().authenticated()
                 )
