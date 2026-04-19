@@ -202,6 +202,26 @@ curl -X POST http://localhost:8080/api/v1/lists \
   }'
 ```
 
+### Generate Invite Link
+
+```bash
+curl -X POST http://localhost:8080/api/v1/lists/<listId>/invite-link \
+  -H "Authorization: Bearer <token>"
+```
+
+### Preview Invite Link (Public)
+
+```bash
+curl http://localhost:8080/api/v1/invites/<inviteToken>
+```
+
+### Accept Invite Link
+
+```bash
+curl -X POST http://localhost:8080/api/v1/invites/<inviteToken>/accept \
+  -H "Authorization: Bearer <token>"
+```
+
 ## Current API Endpoints
 
 ### Auth
