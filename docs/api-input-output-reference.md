@@ -72,6 +72,11 @@ Event payload model:
 }
 ```
 
+Realtime scope note:
+
+1. only item events are published in realtime (ITEM_ADDED, ITEM_UPDATED, ITEM_DELETED)
+2. invite actions do not produce notification events
+
 ---
 
 ## 1) Register
@@ -365,6 +370,11 @@ Validation:
 1. userId: required
 2. role: optional (defaults to MEMBER if null/blank)
 
+Important behavior:
+
+1. this endpoint directly adds the target user to the list_members table (no pending invite request state)
+2. no notification (push/email/realtime) is emitted by this endpoint
+
 Success:
 
 1. Status: 200 OK
@@ -511,6 +521,10 @@ Path params:
 Request body:
 
 None
+
+Important behavior:
+
+1. link can be accepted by multiple different users until expiry (token is marked used internally but not blocked for future accepts)
 
 Success:
 
