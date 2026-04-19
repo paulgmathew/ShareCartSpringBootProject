@@ -1,7 +1,7 @@
 # ShareCart Spring Boot Backend
 
 ShareCart is a Spring Boot REST API backend for a shared shopping list application.
-It provides JWT-based authentication, collaborative shopping lists, member invitations, and item management.
+It provides JWT-based authentication, collaborative shopping lists, member invitations (by user ID and by link), and item management.
 
 ## Overview
 
@@ -13,6 +13,9 @@ Current capabilities:
 - Create shopping lists
 - Fetch list details by id
 - Invite members to a list
+- Generate shareable invite links
+- Accept invite links to join a list
+- Preview invite links before login
 - Add items to a list
 - Update items
 - Delete items
@@ -44,6 +47,8 @@ Main modules:
 - `auth`
 - `shoppinglist`
 - `item`
+- `invite`
+- `realtime`
 - `user`
 - `common.exception`
 - `common.security`
@@ -61,6 +66,17 @@ src/main/java/com/sharecart/sharecart/
     dto/
     model/
     repository/
+    service/
+  invite/
+    controller/
+    dto/
+    model/
+    repository/
+    service/
+  realtime/
+    config/
+    dto/
+    security/
     service/
   shoppinglist/
     controller/
@@ -130,7 +146,7 @@ Public endpoints:
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 
-All other endpoints require this header:
+All other endpoints require this header, except invite preview (`GET /api/v1/invites/{token}`):
 
 ```text
 Authorization: Bearer <token>
@@ -186,6 +202,26 @@ curl -X POST http://localhost:8080/api/v1/lists \
   }'
 ```
 
+### Generate Invite Link
+
+```bash
+curl -X POST http://localhost:8080/api/v1/lists/<listId>/invite-link \
+  -H "Authorization: Bearer <token>"
+```
+
+### Preview Invite Link (Public)
+
+```bash
+curl http://localhost:8080/api/v1/invites/<inviteToken>
+```
+
+### Accept Invite Link
+
+```bash
+curl -X POST http://localhost:8080/api/v1/invites/<inviteToken>/accept \
+  -H "Authorization: Bearer <token>"
+```
+
 ## Current API Endpoints
 
 ### Auth
@@ -200,6 +236,12 @@ curl -X POST http://localhost:8080/api/v1/lists \
 - `GET /api/v1/lists/{id}`
 - `POST /api/v1/lists/{id}/invite`
 
+### Invite Links
+
+- `POST /api/v1/lists/{listId}/invite-link`
+- `POST /api/v1/invites/{token}/accept`
+- `GET /api/v1/invites/{token}`
+
 ### Items
 
 - `POST /api/v1/lists/{listId}/items`
@@ -212,6 +254,8 @@ curl -X POST http://localhost:8080/api/v1/lists \
 - Clients must not send `ownerId` when creating a list
 - `GET /api/v1/lists/me` is the correct home-screen endpoint
 - `PUT /api/v1/items/{id}` behaves like a partial update even though it uses PUT
+- `POST /api/v1/lists/{id}/invite` directly adds membership in `list_members`; it is not a pending request workflow
+- Current realtime events are item-only (`ITEM_ADDED`, `ITEM_UPDATED`, `ITEM_DELETED`)
 
 ## Documentation
 
@@ -221,7 +265,12 @@ Detailed docs:
 - `docs/flutter-backend-integration.md`
 - `docs/flutter-recent-backend-changes.md`
 - `docs/api-input-output-reference.md`
+- `docs/invite-link-implementation.md`
+- `docs/flutter-invite-link-integration.md`
 - `docs/liquibase-project-guide.md`
+- `docs/render-deployment-troubleshooting.md`
+- `docs/realtime-websocket-sync.md`
+- `docs/realtime-phase2-change-log.md`
 
 ## Development Notes
 

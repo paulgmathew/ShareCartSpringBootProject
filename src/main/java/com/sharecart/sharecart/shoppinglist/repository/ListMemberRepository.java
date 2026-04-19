@@ -13,4 +13,6 @@ public interface ListMemberRepository extends JpaRepository<ListMember, UUID> {
     List<ListMember> findByUserId(UUID userId);
 
     Optional<ListMember> findByShoppingListIdAndUserId(UUID listId, UUID userId);
+
+    boolean existsByShoppingListIdAndUserId(UUID listId, UUID userId);
 }

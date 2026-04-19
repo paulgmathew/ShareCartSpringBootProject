@@ -7,6 +7,7 @@ import com.sharecart.sharecart.item.dto.UpdateItemRequest;
 import com.sharecart.sharecart.item.model.Item;
 import com.sharecart.sharecart.item.repository.ItemRepository;
 import com.sharecart.sharecart.item.service.ItemService;
+import com.sharecart.sharecart.realtime.service.ListRealtimePublisher;
 import com.sharecart.sharecart.shoppinglist.model.ShoppingList;
 import com.sharecart.sharecart.shoppinglist.repository.ShoppingListRepository;
 import com.sharecart.sharecart.user.model.User;
@@ -23,6 +24,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemRepository itemRepository;
     private final ShoppingListRepository shoppingListRepository;
     private final UserRepository userRepository;
+    private final ListRealtimePublisher listRealtimePublisher;
 
     @Override
     @Transactional
@@ -45,7 +47,9 @@ public class ItemServiceImpl implements ItemService {
                 .isCompleted(false)
                 .build();
 
-        return toResponse(itemRepository.save(item));
+        ItemResponse created = toResponse(itemRepository.save(item));
+        listRealtimePublisher.publishItemAdded(created.listId(), created);
+        return created;
     }
 
     @Override
@@ -59,7 +63,9 @@ public class ItemServiceImpl implements ItemService {
         if (request.isCompleted() != null) item.setIsCompleted(request.isCompleted());
         if (request.category() != null) item.setCategory(request.category());
 
-        return toResponse(itemRepository.save(item));
+        ItemResponse updated = toResponse(itemRepository.save(item));
+        listRealtimePublisher.publishItemUpdated(updated.listId(), updated);
+        return updated;
     }
 
     @Override
@@ -67,7 +73,10 @@ public class ItemServiceImpl implements ItemService {
     public void deleteItem(UUID id) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
+
+        ItemResponse deleted = toResponse(item);
         itemRepository.delete(item);
+        listRealtimePublisher.publishItemDeleted(deleted.listId(), deleted);
     }
 
     private ItemResponse toResponse(Item item) {
