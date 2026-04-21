@@ -1,0 +1,528 @@
+{
+  "info": {
+    "_postman_id": "b3286c5b-86df-43d3-a595-b4bb34717dfa",
+    "name": "ShareCart Full API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Complete REST API collection for ShareCart (auth, lists, items, invites, stores, prices)."
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"paul@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"Paul\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"paul@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Copy token from response into collection variable token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shopping Lists",
+      "item": [
+        {
+          "name": "Get My Lists",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lists/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weekend Groceries\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/lists",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists"
+              ]
+            },
+            "description": "Save id from response into listId variable."
+          }
+        },
+        {
+          "name": "Get List By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lists/{{listId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists",
+                "{{listId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invite User By UserId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{targetUserId}}\",\n  \"role\": \"MEMBER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/lists/{{listId}}/invite",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists",
+                "{{listId}}",
+                "invite"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        {
+          "name": "Add Item To List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Milk\",\n  \"quantity\": \"2\",\n  \"category\": \"Dairy\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/lists/{{listId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists",
+                "{{listId}}",
+                "items"
+              ]
+            },
+            "description": "Save id from response into itemId variable."
+          }
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Milk\",\n  \"quantity\": \"3\",\n  \"isCompleted\": true,\n  \"category\": \"Dairy\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                "{{itemId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "items",
+                "{{itemId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invite Links",
+      "item": [
+        {
+          "name": "Generate Invite Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lists/{{listId}}/invite-link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lists",
+                "{{listId}}",
+                "invite-link"
+              ]
+            },
+            "description": "Save token from inviteUrl into inviteToken variable."
+          }
+        },
+        {
+          "name": "Preview Invite Link (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invites/{{inviteToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invites",
+                "{{inviteToken}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Accept Invite Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invites/{{inviteToken}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invites",
+                "{{inviteToken}}",
+                "accept"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stores",
+      "item": [
+        {
+          "name": "Find Nearby Stores",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stores/nearby?lat=32.99&lon=-96.70",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stores",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "32.99"
+                },
+                {
+                  "key": "lon",
+                  "value": "-96.70"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Or Resolve Store",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Walmart\",\n  \"address\": \"123 Main St\",\n  \"latitude\": 32.99,\n  \"longitude\": -96.70\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stores"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prices",
+      "item": [
+        {
+          "name": "Create Capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rawText\": \"Milk 1L $3.49\",\n  \"imageUrl\": \"https://example.com/receipt-1.jpg\",\n  \"latitude\": 32.99,\n  \"longitude\": -96.70\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/prices/capture",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prices",
+                "capture"
+              ]
+            },
+            "description": "Save captureId from response into captureId variable."
+          }
+        },
+        {
+          "name": "Confirm Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"captureId\": \"{{captureId}}\",\n  \"itemName\": \"Milk (1L)\",\n  \"price\": 3.49,\n  \"unit\": \"1L\",\n  \"storeName\": \"Walmart\",\n  \"latitude\": 32.99,\n  \"longitude\": -96.70\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/prices/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prices",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Compare Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemName\": \"Milk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/prices/compare",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prices",
+                "compare"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "listId",
+      "value": ""
+    },
+    {
+      "key": "itemId",
+      "value": ""
+    },
+    {
+      "key": "targetUserId",
+      "value": ""
+    },
+    {
+      "key": "inviteToken",
+      "value": ""
+    },
+    {
+      "key": "captureId",
+      "value": ""
+    }
+  ]
+}
