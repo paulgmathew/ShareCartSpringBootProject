@@ -28,9 +28,14 @@ Public endpoints:
 
 Protected endpoints:
 
-All other endpoints require header:
+All other HTTP endpoints require header:
 
 Authorization: Bearer <token>
+
+WebSocket auth note:
+
+1. HTTP handshake endpoint /ws is public
+2. STOMP CONNECT must include Authorization: Bearer <token>
 
 ---
 
@@ -1099,8 +1104,8 @@ Common errors:
 
 Notes:
 
-1. 400: validation failures include details map; also returned for expired invite links and illegal argument/business validation failures
+1. 400: validation failures include details map; also returned for expired invite links and illegal argument validation failures
 2. 401: invalid credentials on login
 3. 404: resource not found
-4. 409: business conflict (duplicate invite, duplicate email, already list member)
+4. 409: business conflict (duplicate invite, duplicate email, already list member, and other IllegalState business rule failures)
 5. 403 on protected routes can come directly from Spring Security when token is missing/invalid; also returned when caller lacks permission (e.g. non-owner generating invite link)
