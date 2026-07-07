@@ -822,55 +822,84 @@ Auth:
 
 Yes
 
-Request body:
+Request body, single-item mode:
 
 ```json
 {
-  "captureId": "88888888-8888-8888-8888-888888888888",
+  "storeId": "77777777-7777-7777-7777-777777777777",
+  "source": "API",
+  "capturedAt": "2026-04-21T10:05:00Z",
   "itemName": "Milk (1L)",
   "price": 3.49,
-  "unit": "1L",
-  "storeName": "Walmart",
-  "latitude": 32.99,
-  "longitude": -96.70
+  "unit": "1L"
+}
+```
+
+Request body, bulk mode:
+
+```json
+{
+  "storeId": "77777777-7777-7777-7777-777777777777",
+  "source": "API",
+  "capturedAt": "2026-04-21T10:05:00Z",
+  "items": [
+    {
+      "itemName": "Milk (1L)",
+      "price": 3.49,
+      "unit": "1L"
+    },
+    {
+      "itemName": "Eggs",
+      "price": 4.29,
+      "unit": "12 pack"
+    }
+  ]
 }
 ```
 
 Validation:
 
-1. captureId: required
-2. itemName: required, not blank
-3. price: required, must be > 0
-4. storeName: required, not blank
-5. latitude: required
-6. longitude: required
+1. storeId: required
+2. source: required, one of MANUAL, OCR, API
+3. capturedAt: required
+4. single mode: itemName and price required
+5. bulk mode: items array required with non-empty itemName and price on each item
+6. price must be > 0
 
 Important behavior:
 
-1. storeId is not accepted from client
-2. backend normalizes item name and resolves store using storeName + location
-3. duplicate prevention: if same normalized item + same store + same price in last 24h, existing entry is returned
-4. source is stored as OCR
-5. createdBy is derived from JWT
+1. storeId is resolved directly on the backend
+2. backend normalizes item names before saving
+3. createdBy is derived from JWT
+4. single requests return one saved id
+5. bulk requests return a count plus all saved ids
 
 Success:
 
-1. Status: 200 OK
-2. Body: ItemPriceResponse
+1. Status: 201 Created
+2. Body: ConfirmPriceResponse
+
+Single response example:
 
 ```json
 {
   "id": "99999999-9999-9999-9999-999999999999",
-  "itemName": "Milk (1L)",
-  "normalizedName": "milk 1l",
-  "storeId": "77777777-7777-7777-7777-777777777777",
-  "storeName": "Walmart",
-  "price": 3.49,
-  "unit": "1L",
-  "capturedAt": "2026-04-21T10:05:00",
-  "source": "OCR",
-  "createdBy": "11111111-1111-1111-1111-111111111111",
-  "createdAt": "2026-04-21T10:05:00"
+  "savedCount": 1,
+  "ids": ["99999999-9999-9999-9999-999999999999"],
+  "message": "Price saved successfully"
+}
+```
+
+Bulk response example:
+
+```json
+{
+  "savedCount": 2,
+  "ids": [
+    "99999999-9999-9999-9999-999999999999",
+    "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  ],
+  "message": "Confirmed prices saved"
 }
 ```
 
@@ -878,9 +907,41 @@ Common errors:
 
 1. 400 Bad Request (validation or invalid price/item)
 2. 403 Forbidden (missing/invalid/expired token)
-3. 404 Not Found (capture not found)
+3. 404 Not Found (store not found)
+4. 401 Unauthorized (missing or invalid auth)
 
 ---
+
+### ConfirmPriceResponse
+
+```json
+{
+  "id": "uuid or null",
+  "savedCount": "number",
+  "ids": ["uuid"],
+  "message": "string"
+}
+```
+
+### ConfirmPriceRequest
+
+```json
+{
+  "storeId": "uuid",
+  "source": "MANUAL|OCR|API",
+  "capturedAt": "ISO offset datetime",
+  "itemName": "string or null",
+  "price": "decimal or null",
+  "unit": "string or null",
+  "items": [
+    {
+      "itemName": "string",
+      "price": "decimal",
+      "unit": "string or null"
+    }
+  ]
+}
+```
 
 ## 17) Compare Price
 

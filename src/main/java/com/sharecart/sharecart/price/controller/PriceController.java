@@ -3,9 +3,9 @@ package com.sharecart.sharecart.price.controller;
 import com.sharecart.sharecart.price.dto.ComparePriceRequest;
 import com.sharecart.sharecart.price.dto.ComparePriceResponse;
 import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
+import com.sharecart.sharecart.price.dto.ConfirmPriceResponse;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureRequest;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureResponse;
-import com.sharecart.sharecart.price.dto.ItemPriceResponse;
 import com.sharecart.sharecart.price.service.PriceService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -33,9 +33,9 @@ public class PriceController {
     }
 
     @PostMapping("/confirm")
-    public ResponseEntity<ItemPriceResponse> confirmPrice(@Valid @RequestBody ConfirmPriceRequest request) {
+    public ResponseEntity<ConfirmPriceResponse> confirmPrice(@Valid @RequestBody ConfirmPriceRequest request) {
         UUID userId = UUID.fromString((String) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
-        return ResponseEntity.ok(priceService.confirmPrice(request, userId));
+        return ResponseEntity.status(HttpStatus.CREATED).body(priceService.confirmPrice(request, userId));
     }
 
     @PostMapping("/compare")
