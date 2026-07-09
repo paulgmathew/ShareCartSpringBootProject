@@ -6,6 +6,8 @@ import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceResponse;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureRequest;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureResponse;
+import com.sharecart.sharecart.price.dto.ItemPriceResponse;
+import java.util.List;
 import java.util.UUID;
 
 public interface PriceService {
@@ -17,4 +19,6 @@ public interface PriceService {
     ConfirmPriceResponse confirmPrice(ConfirmPriceRequest request, UUID userId);
 
     ComparePriceResponse comparePrice(ComparePriceRequest request);
+
+    List<ItemPriceResponse> getPriceHistory(UUID userId, String itemNameFilter);
 }

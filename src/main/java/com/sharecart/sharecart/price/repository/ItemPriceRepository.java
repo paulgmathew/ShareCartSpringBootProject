@@ -11,4 +11,8 @@ public interface ItemPriceRepository extends JpaRepository<ItemPrice, UUID> {
     List<ItemPrice> findByNormalizedName(String normalizedName);
 
     Optional<ItemPrice> findTopByNormalizedNameAndStoreIdOrderByCreatedAtDesc(String normalizedName, UUID storeId);
+
+    List<ItemPrice> findByCreatedByOrderByCreatedAtDesc(UUID createdBy);
+
+    List<ItemPrice> findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(UUID createdBy, String normalizedName);
 }

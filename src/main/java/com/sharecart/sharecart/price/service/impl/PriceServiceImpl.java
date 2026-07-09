@@ -8,6 +8,7 @@ import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceResponse;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureRequest;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureResponse;
+import com.sharecart.sharecart.price.dto.ItemPriceResponse;
 import com.sharecart.sharecart.price.model.ItemPrice;
 import com.sharecart.sharecart.price.model.PriceCapture;
 import com.sharecart.sharecart.price.model.Store;
@@ -111,6 +112,42 @@ public class PriceServiceImpl implements PriceService {
                 lowest.getStore().getId(),
                 average,
                 entries.size()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ItemPriceResponse> getPriceHistory(UUID userId, String itemNameFilter) {
+        String normalizedFilter = normalizeItemName(itemNameFilter);
+
+        List<ItemPrice> entries;
+        if (normalizedFilter.isBlank()) {
+            entries = itemPriceRepository.findByCreatedByOrderByCreatedAtDesc(userId);
+        } else {
+            entries = itemPriceRepository.findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(
+                    userId,
+                    normalizedFilter
+            );
+        }
+
+        return entries.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private ItemPriceResponse toResponse(ItemPrice itemPrice) {
+        return new ItemPriceResponse(
+                itemPrice.getId(),
+                itemPrice.getItemName(),
+                itemPrice.getNormalizedName(),
+                itemPrice.getStore().getId(),
+                itemPrice.getStore().getName(),
+                itemPrice.getPrice(),
+                itemPrice.getUnit(),
+                itemPrice.getCapturedAt(),
+                itemPrice.getSource(),
+                itemPrice.getCreatedBy(),
+                itemPrice.getCreatedAt()
         );
     }
 
