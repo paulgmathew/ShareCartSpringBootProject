@@ -21,4 +21,6 @@ public interface PriceService {
     ComparePriceResponse comparePrice(ComparePriceRequest request);
 
     List<ItemPriceResponse> getPriceHistory(UUID userId, String itemNameFilter);
+
+    void deletePriceHistoryEntry(UUID userId, UUID priceId);
 }

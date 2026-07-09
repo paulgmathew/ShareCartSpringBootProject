@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -148,6 +149,21 @@ public class PriceServiceImpl implements PriceService {
         return entries.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void deletePriceHistoryEntry(UUID userId, UUID priceId) {
+        ItemPrice itemPrice = itemPriceRepository.findById(priceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Price history entry not found with id: " + priceId));
+
+        if (!userId.equals(itemPrice.getCreatedBy())) {
+            log.warn("Forbidden price history delete attempt priceId={} ownerId={} requesterId={}", priceId, itemPrice.getCreatedBy(), userId);
+            throw new AccessDeniedException("You cannot delete this price history entry");
+        }
+
+        itemPriceRepository.delete(itemPrice);
+        log.info("Deleted price history entry priceId={} userId={}", priceId, userId);
     }
 
     private ItemPriceResponse toResponse(ItemPrice itemPrice) {

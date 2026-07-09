@@ -2,11 +2,13 @@ package com.sharecart.sharecart.price.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sharecart.sharecart.common.exception.ResourceNotFoundException;
 import com.sharecart.sharecart.price.dto.ConfirmPriceItemRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
 import com.sharecart.sharecart.price.dto.StoreInfoRequest;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PriceServiceImplTest {
@@ -37,7 +40,7 @@ class PriceServiceImplTest {
     private ItemPriceRepository itemPriceRepository;
 
     @Mock
-        private StoreResolverService storeResolverService;
+    private StoreResolverService storeResolverService;
 
     private PriceServiceImpl priceService;
 
@@ -122,8 +125,8 @@ class PriceServiceImplTest {
         assertEquals("Confirmed prices saved", response.message());
     }
 
-        @Test
-        void shouldReturnPriceHistoryWithoutFilter() {
+    @Test
+    void shouldReturnPriceHistoryWithoutFilter() {
         UUID userId = UUID.randomUUID();
         Store store = Store.builder().id(UUID.randomUUID()).name("Walmart").build();
 
@@ -164,10 +167,10 @@ class PriceServiceImplTest {
         verify(itemPriceRepository).findByCreatedByOrderByCreatedAtDesc(userId);
         verify(itemPriceRepository, never())
             .findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(any(UUID.class), any(String.class));
-        }
+    }
 
-        @Test
-        void shouldReturnPriceHistoryWithFilter() {
+    @Test
+    void shouldReturnPriceHistoryWithFilter() {
         UUID userId = UUID.randomUUID();
         Store store = Store.builder().id(UUID.randomUUID()).name("Walmart").build();
 
@@ -194,5 +197,54 @@ class PriceServiceImplTest {
         assertEquals("whole milk", response.get(0).normalizedName());
         verify(itemPriceRepository).findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(userId, "milk");
         verify(itemPriceRepository, never()).findByCreatedByOrderByCreatedAtDesc(userId);
-        }
+    }
+
+    @Test
+    void shouldDeleteOwnedPriceHistoryEntry() {
+        UUID userId = UUID.randomUUID();
+        UUID priceId = UUID.randomUUID();
+        ItemPrice itemPrice = ItemPrice.builder()
+                .id(priceId)
+                .createdBy(userId)
+                .build();
+
+        when(itemPriceRepository.findById(priceId)).thenReturn(Optional.of(itemPrice));
+
+        priceService.deletePriceHistoryEntry(userId, priceId);
+
+        verify(itemPriceRepository).delete(itemPrice);
+    }
+
+    @Test
+    void shouldRejectDeletingAnotherUsersPriceHistoryEntry() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID priceId = UUID.randomUUID();
+        ItemPrice itemPrice = ItemPrice.builder()
+                .id(priceId)
+                .createdBy(otherUserId)
+                .build();
+
+        when(itemPriceRepository.findById(priceId)).thenReturn(Optional.of(itemPrice));
+
+        assertThrows(AccessDeniedException.class, () -> priceService.deletePriceHistoryEntry(userId, priceId));
+
+        verify(itemPriceRepository, never()).delete(any(ItemPrice.class));
+    }
+
+    @Test
+    void shouldThrowWhenDeletingMissingPriceHistoryEntry() {
+        UUID userId = UUID.randomUUID();
+        UUID priceId = UUID.randomUUID();
+
+        when(itemPriceRepository.findById(priceId)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> priceService.deletePriceHistoryEntry(userId, priceId)
+        );
+
+        assertEquals("Price history entry not found with id: " + priceId, exception.getMessage());
+        verify(itemPriceRepository, never()).delete(any(ItemPrice.class));
+    }
 }
