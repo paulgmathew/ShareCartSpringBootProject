@@ -11,9 +11,11 @@ import com.sharecart.sharecart.price.util.HaversineDistanceUtil;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StoreServiceImpl implements StoreService {
@@ -27,6 +29,7 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public List<NearbyStoreResponse> findNearbyStores(Double latitude, Double longitude) {
+        log.debug("Searching nearby stores lat={} lon={} delta={}", latitude, longitude, BOUNDING_BOX_DELTA);
         List<Store> nearbyCandidates = storeRepository.findByBoundingBox(
                 latitude - BOUNDING_BOX_DELTA,
                 latitude + BOUNDING_BOX_DELTA,
@@ -34,7 +37,7 @@ public class StoreServiceImpl implements StoreService {
                 longitude + BOUNDING_BOX_DELTA
         );
 
-        return nearbyCandidates.stream()
+        List<NearbyStoreResponse> results = nearbyCandidates.stream()
                 .map(store -> new NearbyStoreResponse(
                         toResponse(store),
                         HaversineDistanceUtil.distanceInMeters(
@@ -47,12 +50,17 @@ public class StoreServiceImpl implements StoreService {
                 .sorted(Comparator.comparingDouble(NearbyStoreResponse::distanceMeters))
                 .limit(NEARBY_RESULTS_LIMIT)
                 .toList();
+
+        log.info("Found {} nearby store(s) lat={} lon={}", results.size(), latitude, longitude);
+        return results;
     }
 
     @Override
     @Transactional
     public StoreResponse createStoreIfNotExists(String name, String address, Double latitude, Double longitude) {
+        log.info("Resolving store name={} lat={} lon={}", name, latitude, longitude);
         Store store = resolveStore(name, address, latitude, longitude);
+        log.info("Store resolved storeId={} name={}", store.getId(), store.getName());
         return toResponse(store);
     }
 

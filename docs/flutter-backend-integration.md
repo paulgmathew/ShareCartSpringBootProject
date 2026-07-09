@@ -10,13 +10,12 @@ It includes JWT auth, list retrieval for the logged-in user, and the latest endp
 ## Current Backend Flows
 
 - Register and login with JWT
-- Create a shopping list (owner is derived from JWT)
-- Fetch all lists for the logged-in user
-- Fetch a shopping list by ID
-- Invite a user to a shopping list
-- Add an item to a shopping list
-- Update an item
-- Delete an item
+- Create and manage shopping lists
+- Add, update, and delete list items
+- Generate and accept invite links
+- Preview invite links without login
+- Capture, confirm, compare, and view price history
+- Discover nearby stores and register stores
 
 ---
 
@@ -35,6 +34,7 @@ It includes JWT auth, list retrieval for the logged-in user, and the latest endp
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
+- `GET /api/v1/invites/{token}` (invite preview only)
 
 ### Protected endpoints
 
@@ -70,9 +70,18 @@ Store `token` securely (for example `flutter_secure_storage`) and attach it to e
 4. `POST /api/v1/lists`
 5. `GET /api/v1/lists/{id}`
 6. `POST /api/v1/lists/{id}/invite`
-7. `POST /api/v1/lists/{listId}/items`
-8. `PUT /api/v1/items/{id}`
-9. `DELETE /api/v1/items/{id}`
+7. `POST /api/v1/lists/{listId}/invite-link`
+8. `GET /api/v1/invites/{token}` (public)
+9. `POST /api/v1/invites/{token}/accept`
+10. `POST /api/v1/lists/{listId}/items`
+11. `PUT /api/v1/items/{id}`
+12. `DELETE /api/v1/items/{id}`
+13. `POST /api/v1/prices/capture`
+14. `POST /api/v1/prices/confirm`
+15. `POST /api/v1/prices/compare`
+16. `GET /api/v1/prices/history`
+17. `GET /api/v1/stores/nearby`
+18. `POST /api/v1/stores`
 
 ---
 
@@ -181,6 +190,68 @@ Content-Type: application/json
 
 ---
 
+## Generate Invite Link
+
+### Endpoint
+
+```text
+POST /api/v1/lists/{listId}/invite-link
+Authorization: Bearer <token>
+```
+
+### Response
+
+```json
+{
+  "inviteUrl": "https://sharecart.app/invite/abc123token"
+}
+```
+
+---
+
+## Invite Preview (Public)
+
+### Endpoint
+
+```text
+GET /api/v1/invites/{token}
+```
+
+### Behavior
+
+This endpoint is public and does not require a bearer token.
+
+### Response
+
+```json
+{
+  "listName": "Weekend Groceries",
+  "ownerName": "Paul"
+}
+```
+
+---
+
+## Accept Invite
+
+### Endpoint
+
+```text
+POST /api/v1/invites/{token}/accept
+Authorization: Bearer <token>
+```
+
+### Response
+
+```json
+{
+  "listId": "22222222-2222-2222-2222-222222222222",
+  "message": "Invite accepted"
+}
+```
+
+---
+
 ## Add Item
 
 ### Endpoint
@@ -231,6 +302,158 @@ Authorization: Bearer <token>
 ```
 
 Success: `204 No Content`.
+
+---
+
+## Price APIs
+
+### Create Price Capture
+
+#### Endpoint
+
+```text
+POST /api/v1/prices/capture
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request body
+
+```json
+{
+  "rawText": "Milk 2L - 3.99",
+  "imageUrl": "https://example.com/receipt.jpg",
+  "latitude": 9.9312,
+  "longitude": 76.2673
+}
+```
+
+#### Success
+
+- `201 Created`
+- Response:
+
+```json
+{
+  "captureId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+}
+```
+
+### Confirm Prices
+
+#### Endpoint
+
+```text
+POST /api/v1/prices/confirm
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request body
+
+```json
+{
+  "captureId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "scanType": "RECEIPT",
+  "source": "OCR",
+  "capturedAt": "2026-03-22T22:05:00Z",
+  "store": {
+    "name": "Fresh Mart",
+    "address": "MG Road",
+    "latitude": 9.9312,
+    "longitude": 76.2673
+  },
+  "items": [
+    {
+      "itemName": "Milk",
+      "price": 3.99,
+      "unit": "L"
+    }
+  ]
+}
+```
+
+`source` must be one of: `MANUAL`, `OCR`, `API`.
+
+### Compare Price
+
+#### Endpoint
+
+```text
+POST /api/v1/prices/compare
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request body
+
+```json
+{
+  "itemName": "Milk"
+}
+```
+
+#### Response
+
+```json
+{
+  "lowestPrice": 3.49,
+  "lowestStoreId": "55555555-5555-5555-5555-555555555555",
+  "averagePrice": 3.75,
+  "totalEntries": 8
+}
+```
+
+### Get Price History
+
+#### Endpoint
+
+```text
+GET /api/v1/prices/history
+Authorization: Bearer <token>
+```
+
+Optional query:
+
+```text
+GET /api/v1/prices/history?itemName=milk
+```
+
+Returns the authenticated user's price entries ordered newest first.
+
+---
+
+## Store APIs
+
+### Find Nearby Stores
+
+#### Endpoint
+
+```text
+GET /api/v1/stores/nearby?lat=9.9312&lon=76.2673
+Authorization: Bearer <token>
+```
+
+### Create Store
+
+#### Endpoint
+
+```text
+POST /api/v1/stores
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request body
+
+```json
+{
+  "name": "Fresh Mart",
+  "address": "MG Road",
+  "latitude": 9.9312,
+  "longitude": 76.2673
+}
+```
 
 ---
 
@@ -287,11 +510,12 @@ Success: `204 No Content`.
 
 Common statuses:
 
-- `400` validation errors
+- `400` validation errors or bad request input
 - `401` invalid login credentials
 - `403` missing/invalid/expired token on protected endpoints
 - `404` resource not found
 - `409` business conflict (for example duplicate member invite)
+- `500` unexpected server errors
 
 ---
 
@@ -300,8 +524,10 @@ Common statuses:
 1. Call login/register and save `token` + `userId`.
 2. On app landing page, call `GET /lists/me` with bearer token.
 3. On create list, send only `name`.
-4. After write operations, refresh list data via `GET /lists/{id}` or refresh home via `GET /lists/me`.
-5. On `403`, redirect user to login.
+4. Use invite links for sharing: generate via `POST /lists/{listId}/invite-link`, preview via `GET /invites/{token}`, accept via `POST /invites/{token}/accept`.
+5. Use price flow when needed: capture -> confirm -> compare/history.
+6. After write operations, refresh list data via `GET /lists/{id}` or refresh home via `GET /lists/me`.
+7. On `403`, redirect user to login.
 
 ---
 
@@ -337,9 +563,18 @@ Create list:
 Other endpoints:
 - GET /api/v1/lists/{id}
 - POST /api/v1/lists/{id}/invite
+- POST /api/v1/lists/{listId}/invite-link
+- GET /api/v1/invites/{token} (public)
+- POST /api/v1/invites/{token}/accept
 - POST /api/v1/lists/{listId}/items
 - PUT /api/v1/items/{id}
 - DELETE /api/v1/items/{id}
+- POST /api/v1/prices/capture
+- POST /api/v1/prices/confirm
+- POST /api/v1/prices/compare
+- GET /api/v1/prices/history?itemName=milk
+- GET /api/v1/stores/nearby?lat=...&lon=...
+- POST /api/v1/stores
 
 On 403, redirect to login.
 Store token in flutter_secure_storage.

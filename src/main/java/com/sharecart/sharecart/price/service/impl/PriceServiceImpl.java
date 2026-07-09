@@ -25,9 +25,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PriceServiceImpl implements PriceService {
@@ -51,6 +53,7 @@ public class PriceServiceImpl implements PriceService {
     @Override
     @Transactional
     public CreatePriceCaptureResponse createCapture(CreatePriceCaptureRequest request, UUID userId) {
+        log.debug("Creating price capture for userId={} lat={} lon={}", userId, request.latitude(), request.longitude());
         PriceCapture capture = PriceCapture.builder()
                 .rawText(request.rawText())
                 .imageUrl(request.imageUrl())
@@ -60,14 +63,19 @@ public class PriceServiceImpl implements PriceService {
                 .build();
 
         PriceCapture saved = priceCaptureRepository.save(capture);
+        log.info("Price capture saved captureId={} userId={}", saved.getId(), userId);
         return new CreatePriceCaptureResponse(saved.getId());
     }
 
     @Override
     @Transactional
     public ConfirmPriceResponse confirmPrice(ConfirmPriceRequest request, UUID userId) {
+        log.debug("Confirming prices captureId={} itemCount={} userId={}", request.captureId(), request.items().size(), userId);
         priceCaptureRepository.findById(request.captureId())
-                .orElseThrow(() -> new ResourceNotFoundException("Capture not found with id: " + request.captureId()));
+                .orElseThrow(() -> {
+                    log.warn("Capture not found captureId={}", request.captureId());
+                    return new ResourceNotFoundException("Capture not found with id: " + request.captureId());
+                });
 
         Store store = storeResolverService.resolve(request.store());
         String source = normalizeSource(request.source());
@@ -78,6 +86,8 @@ public class PriceServiceImpl implements PriceService {
             ItemPrice saved = saveConfirmedPrice(item, store, source, capturedAt, userId);
             savedIds.add(saved.getId());
         }
+
+        log.info("Confirmed {} price(s) storeId={} source={} userId={}", savedIds.size(), store.getId(), source, userId);
 
         if (savedIds.size() == 1) {
             UUID savedId = savedIds.get(0);
@@ -91,9 +101,11 @@ public class PriceServiceImpl implements PriceService {
     @Transactional(readOnly = true)
     public ComparePriceResponse comparePrice(ComparePriceRequest request) {
         String normalizedName = normalizeItemName(request.itemName());
+        log.debug("Comparing prices normalizedName={}", normalizedName);
         List<ItemPrice> entries = itemPriceRepository.findByNormalizedName(normalizedName);
 
         if (entries.isEmpty()) {
+            log.warn("No prices found for item normalizedName={}", normalizedName);
             throw new ResourceNotFoundException("No prices found for item: " + request.itemName());
         }
 
@@ -107,6 +119,7 @@ public class PriceServiceImpl implements PriceService {
 
         BigDecimal average = total.divide(BigDecimal.valueOf(entries.size()), 2, RoundingMode.HALF_UP);
 
+        log.info("Price comparison normalizedName={} lowestPrice={} avgPrice={} entryCount={}", normalizedName, lowest.getPrice(), average, entries.size());
         return new ComparePriceResponse(
                 lowest.getPrice(),
                 lowest.getStore().getId(),
@@ -119,6 +132,7 @@ public class PriceServiceImpl implements PriceService {
     @Transactional(readOnly = true)
     public List<ItemPriceResponse> getPriceHistory(UUID userId, String itemNameFilter) {
         String normalizedFilter = normalizeItemName(itemNameFilter);
+        log.debug("Fetching price history userId={} normalizedFilter={}", userId, normalizedFilter.isBlank() ? "(none)" : normalizedFilter);
 
         List<ItemPrice> entries;
         if (normalizedFilter.isBlank()) {
@@ -130,6 +144,7 @@ public class PriceServiceImpl implements PriceService {
             );
         }
 
+        log.info("Price history fetched userId={} resultCount={}", userId, entries.size());
         return entries.stream()
                 .map(this::toResponse)
                 .toList();

@@ -9,10 +9,12 @@ import com.sharecart.sharecart.common.security.JwtUtil;
 import com.sharecart.sharecart.user.model.User;
 import com.sharecart.sharecart.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -25,6 +27,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.email()).isPresent()) {
+            log.warn("Registration attempt with already-registered email");
             throw new IllegalStateException("Email is already registered: " + request.email());
         }
 
@@ -35,6 +38,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         User saved = userRepository.save(user);
+        log.info("User registered userId={}", saved.getId());
         String token = jwtUtil.generateToken(saved.getId(), saved.getEmail());
 
         return new AuthResponse(token, "Bearer", saved.getId(), saved.getEmail(), saved.getName());
@@ -45,12 +49,17 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse login(LoginRequest request) {
         // deliberately use a generic error to avoid revealing whether the email exists
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
+                .orElseThrow(() -> {
+                    log.warn("Login attempt with unknown email");
+                    return new InvalidCredentialsException();
+                });
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            log.warn("Login failed — wrong password userId={}", user.getId());
             throw new InvalidCredentialsException();
         }
 
+        log.info("User logged in userId={}", user.getId());
         String token = jwtUtil.generateToken(user.getId(), user.getEmail());
 
         return new AuthResponse(token, "Bearer", user.getId(), user.getEmail(), user.getName());
