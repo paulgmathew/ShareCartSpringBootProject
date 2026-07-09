@@ -21,9 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ShoppingListServiceImpl implements ShoppingListService {
@@ -36,6 +38,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     @Override
     @Transactional
     public ShoppingListResponse createList(CreateListRequest request, UUID ownerId) {
+        log.debug("Creating shopping list name={} ownerId={}", request.name(), ownerId);
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + ownerId));
 
@@ -53,12 +56,14 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .build();
         listMemberRepository.save(ownerMember);
 
+        log.info("Shopping list created listId={} ownerId={}", saved.getId(), ownerId);
         return toResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<MyListResponse> getMyLists(UUID userId) {
+        log.debug("Fetching lists for userId={}", userId);
         User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
@@ -91,23 +96,31 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             ));
         }
 
-        return lists.values().stream()
+        List<MyListResponse> result = lists.values().stream()
                 .sorted(Comparator.comparing(MyListResponse::updatedAt).reversed())
                 .toList();
+        log.info("Lists fetched userId={} count={}", userId, result.size());
+        return result;
     }
 
     @Override
     @Transactional(readOnly = true)
     public ShoppingListResponse getListById(UUID id) {
+        log.debug("Fetching shopping list listId={}", id);
         ShoppingList shoppingList = shoppingListRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Shopping list not found listId={}", id);
+                    return new ResourceNotFoundException("Shopping list not found with id: " + id);
+                });
 
+        log.info("Shopping list fetched listId={}", id);
         return toResponse(shoppingList);
     }
 
     @Override
     @Transactional
     public void inviteUser(UUID listId, InviteRequest request) {
+        log.debug("Inviting userId={} to listId={}", request.userId(), listId);
         ShoppingList shoppingList = shoppingListRepository.findById(listId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found with id: " + listId));
 
@@ -115,7 +128,10 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.userId()));
 
         listMemberRepository.findByShoppingListIdAndUserId(listId, request.userId())
-                .ifPresent(m -> { throw new IllegalStateException("User is already a member of this list"); });
+                .ifPresent(m -> {
+                    log.warn("User already a member listId={} userId={}", listId, request.userId());
+                    throw new IllegalStateException("User is already a member of this list");
+                });
 
         String role = (request.role() != null && !request.role().isBlank())
                 ? request.role().toUpperCase()
@@ -128,6 +144,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .build();
 
         listMemberRepository.save(member);
+        log.info("User invited listId={} userId={} role={}", listId, user.getId(), role);
     }
 
     private ShoppingListResponse toResponse(ShoppingList shoppingList) {

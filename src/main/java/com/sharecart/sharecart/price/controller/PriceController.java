@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PriceController {
 
     private final PriceService priceService;
-    
+    //not used 
     @PostMapping("/capture") 
     public ResponseEntity<CreatePriceCaptureResponse> createCapture(@Valid @RequestBody CreatePriceCaptureRequest request) {
         UUID userId = UUID.fromString((String) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
