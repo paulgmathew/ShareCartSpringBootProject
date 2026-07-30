@@ -14,9 +14,11 @@ import com.sharecart.sharecart.user.model.User;
 import com.sharecart.sharecart.user.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
@@ -29,6 +31,7 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public ItemResponse addItem(UUID listId, CreateItemRequest request) {
+        log.debug("Adding item name={} to listId={}", request.name(), listId);
         ShoppingList shoppingList = shoppingListRepository.findById(listId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found with id: " + listId));
 
@@ -48,6 +51,7 @@ public class ItemServiceImpl implements ItemService {
                 .build();
 
         ItemResponse created = toResponse(itemRepository.save(item));
+        log.info("Item added itemId={} name={} listId={}", created.id(), created.name(), listId);
         listRealtimePublisher.publishItemAdded(created.listId(), created);
         return created;
     }
@@ -55,8 +59,12 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public ItemResponse updateItem(UUID id, UpdateItemRequest request) {
+        log.debug("Updating itemId={}", id);
         Item item = itemRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Item not found itemId={}", id);
+                    return new ResourceNotFoundException("Item not found with id: " + id);
+                });
 
         if (request.name() != null) item.setName(request.name());
         if (request.quantity() != null) item.setQuantity(request.quantity());
@@ -64,6 +72,7 @@ public class ItemServiceImpl implements ItemService {
         if (request.category() != null) item.setCategory(request.category());
 
         ItemResponse updated = toResponse(itemRepository.save(item));
+        log.info("Item updated itemId={} listId={}", updated.id(), updated.listId());
         listRealtimePublisher.publishItemUpdated(updated.listId(), updated);
         return updated;
     }
@@ -71,11 +80,16 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public void deleteItem(UUID id) {
+        log.debug("Deleting itemId={}", id);
         Item item = itemRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Item not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Item not found itemId={}", id);
+                    return new ResourceNotFoundException("Item not found with id: " + id);
+                });
 
         ItemResponse deleted = toResponse(item);
         itemRepository.delete(item);
+        log.info("Item deleted itemId={} listId={}", id, deleted.listId());
         listRealtimePublisher.publishItemDeleted(deleted.listId(), deleted);
     }
 

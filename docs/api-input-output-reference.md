@@ -24,12 +24,18 @@ Public endpoints:
 
 1. POST /api/v1/auth/register
 2. POST /api/v1/auth/login
+3. GET /api/v1/invites/{token}
 
 Protected endpoints:
 
-All other endpoints require header:
+All other HTTP endpoints require header:
 
 Authorization: Bearer <token>
+
+WebSocket auth note:
+
+1. HTTP handshake endpoint /ws is public
+2. STOMP CONNECT must include Authorization: Bearer <token>
 
 ---
 
@@ -522,10 +528,6 @@ Request body:
 
 None
 
-Important behavior:
-
-1. link can be accepted by multiple different users until expiry (token is marked used internally but not blocked for future accepts)
-
 Success:
 
 1. Status: 204 No Content
@@ -598,6 +600,10 @@ Request body:
 
 None
 
+Important behavior:
+
+1. link can be accepted by multiple different users until expiry (token is marked used internally but not blocked for future accepts)
+
 Success:
 
 1. Status: 200 OK
@@ -657,6 +663,331 @@ Success:
 Common errors:
 
 1. 404 Not Found (invite token not found or invalid)
+
+---
+
+## 13) Find Nearby Stores
+
+Endpoint:
+
+GET /api/v1/stores/nearby?lat={latitude}&lon={longitude}
+
+Auth:
+
+Yes
+
+Query params:
+
+1. lat: Double (required)
+2. lon: Double (required)
+
+Request body:
+
+None
+
+Important behavior:
+
+1. backend first applies a bounding-box search
+2. backend then computes exact distance using Haversine in Java
+3. results are sorted by distance and limited to top 10
+
+Success:
+
+1. Status: 200 OK
+2. Body: array of NearbyStoreResponse
+
+```json
+[
+  {
+    "store": {
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "Walmart",
+      "address": "123 Main St",
+      "latitude": 32.99,
+      "longitude": -96.70,
+      "createdAt": "2026-04-21T10:00:00"
+    },
+    "distanceMeters": 85.24
+  }
+]
+```
+
+Common errors:
+
+1. 400 Bad Request (missing lat/lon)
+2. 403 Forbidden (missing/invalid/expired token)
+
+---
+
+## 14) Create Store
+
+Endpoint:
+
+POST /api/v1/stores
+
+Auth:
+
+Yes
+
+Request body:
+
+```json
+{
+  "name": "Walmart",
+  "address": "123 Main St",
+  "latitude": 32.99,
+  "longitude": -96.70
+}
+```
+
+Validation:
+
+1. name: required
+2. latitude: required
+3. longitude: required
+
+Important behavior:
+
+1. if an existing store has the same name and is within 200m, backend returns that store
+2. otherwise backend creates a new store row
+
+Success:
+
+1. Status: 201 Created
+2. Body: StoreResponse
+
+Common errors:
+
+1. 400 Bad Request (validation)
+2. 403 Forbidden (missing/invalid/expired token)
+
+---
+
+## 15) Create Price Capture
+
+Endpoint:
+
+POST /api/v1/prices/capture
+
+Auth:
+
+Yes
+
+Request body:
+
+```json
+{
+  "rawText": "Milk 1L $3.49",
+  "imageUrl": "https://example.com/receipt-1.jpg",
+  "latitude": 32.99,
+  "longitude": -96.70
+}
+```
+
+Validation:
+
+1. latitude: required
+2. longitude: required
+
+Important behavior:
+
+1. created_by/user_id is derived from JWT principal
+2. capture is stored in price_captures
+
+Success:
+
+1. Status: 201 Created
+2. Body: CreatePriceCaptureResponse
+
+```json
+{
+  "captureId": "88888888-8888-8888-8888-888888888888"
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (validation)
+2. 403 Forbidden (missing/invalid/expired token)
+
+---
+
+## 16) Confirm Price
+
+Endpoint:
+
+POST /api/v1/prices/confirm
+
+Auth:
+
+Yes
+
+Request body, single-item mode:
+
+```json
+{
+  "storeId": "77777777-7777-7777-7777-777777777777",
+  "source": "API",
+  "capturedAt": "2026-04-21T10:05:00Z",
+  "itemName": "Milk (1L)",
+  "price": 3.49,
+  "unit": "1L"
+}
+```
+
+Request body, bulk mode:
+
+```json
+{
+  "storeId": "77777777-7777-7777-7777-777777777777",
+  "source": "API",
+  "capturedAt": "2026-04-21T10:05:00Z",
+  "items": [
+    {
+      "itemName": "Milk (1L)",
+      "price": 3.49,
+      "unit": "1L"
+    },
+    {
+      "itemName": "Eggs",
+      "price": 4.29,
+      "unit": "12 pack"
+    }
+  ]
+}
+```
+
+Validation:
+
+1. storeId: required
+2. source: required, one of MANUAL, OCR, API
+3. capturedAt: required
+4. single mode: itemName and price required
+5. bulk mode: items array required with non-empty itemName and price on each item
+6. price must be > 0
+
+Important behavior:
+
+1. storeId is resolved directly on the backend
+2. backend normalizes item names before saving
+3. createdBy is derived from JWT
+4. single requests return one saved id
+5. bulk requests return a count plus all saved ids
+
+Success:
+
+1. Status: 201 Created
+2. Body: ConfirmPriceResponse
+
+Single response example:
+
+```json
+{
+  "id": "99999999-9999-9999-9999-999999999999",
+  "savedCount": 1,
+  "ids": ["99999999-9999-9999-9999-999999999999"],
+  "message": "Price saved successfully"
+}
+```
+
+Bulk response example:
+
+```json
+{
+  "savedCount": 2,
+  "ids": [
+    "99999999-9999-9999-9999-999999999999",
+    "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  ],
+  "message": "Confirmed prices saved"
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (validation or invalid price/item)
+2. 403 Forbidden (missing/invalid/expired token)
+3. 404 Not Found (store not found)
+4. 401 Unauthorized (missing or invalid auth)
+
+---
+
+### ConfirmPriceResponse
+
+```json
+{
+  "id": "uuid or null",
+  "savedCount": "number",
+  "ids": ["uuid"],
+  "message": "string"
+}
+```
+
+### ConfirmPriceRequest
+
+```json
+{
+  "storeId": "uuid",
+  "source": "MANUAL|OCR|API",
+  "capturedAt": "ISO offset datetime",
+  "itemName": "string or null",
+  "price": "decimal or null",
+  "unit": "string or null",
+  "items": [
+    {
+      "itemName": "string",
+      "price": "decimal",
+      "unit": "string or null"
+    }
+  ]
+}
+```
+
+## 17) Compare Price
+
+Endpoint:
+
+POST /api/v1/prices/compare
+
+Auth:
+
+Yes
+
+Request body:
+
+```json
+{
+  "itemName": "Milk"
+}
+```
+
+Validation:
+
+1. itemName: required, not blank
+
+Important behavior:
+
+1. backend normalizes itemName and matches using normalized_name only
+
+Success:
+
+1. Status: 200 OK
+2. Body: ComparePriceResponse
+
+```json
+{
+  "lowestPrice": 3.49,
+  "lowestStoreId": "77777777-7777-7777-7777-777777777777",
+  "averagePrice": 3.89,
+  "totalEntries": 12
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (validation)
+2. 403 Forbidden (missing/invalid/expired token)
+3. 404 Not Found (no prices found for item)
 
 ---
 
@@ -757,6 +1088,65 @@ Common errors:
 }
 ```
 
+### StoreResponse
+
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "address": "string or null",
+  "latitude": "double",
+  "longitude": "double",
+  "createdAt": "ISO local datetime"
+}
+```
+
+### NearbyStoreResponse
+
+```json
+{
+  "store": "StoreResponse",
+  "distanceMeters": "double"
+}
+```
+
+### CreatePriceCaptureResponse
+
+```json
+{
+  "captureId": "uuid"
+}
+```
+
+### ItemPriceResponse
+
+```json
+{
+  "id": "uuid",
+  "itemName": "string",
+  "normalizedName": "string",
+  "storeId": "uuid",
+  "storeName": "string",
+  "price": "decimal",
+  "unit": "string or null",
+  "capturedAt": "ISO local datetime",
+  "source": "string",
+  "createdBy": "uuid",
+  "createdAt": "ISO local datetime"
+}
+```
+
+### ComparePriceResponse
+
+```json
+{
+  "lowestPrice": "decimal",
+  "lowestStoreId": "uuid",
+  "averagePrice": "decimal",
+  "totalEntries": "number"
+}
+```
+
 ---
 
 ## Standard Error Body (when handled by GlobalExceptionHandler)
@@ -775,8 +1165,8 @@ Common errors:
 
 Notes:
 
-1. 400: validation failures include details map; also returned for expired invite links
+1. 400: validation failures include details map; also returned for expired invite links and illegal argument validation failures
 2. 401: invalid credentials on login
 3. 404: resource not found
-4. 409: business conflict (duplicate invite, duplicate email, already list member)
+4. 409: business conflict (duplicate invite, duplicate email, already list member, and other IllegalState business rule failures)
 5. 403 on protected routes can come directly from Spring Security when token is missing/invalid; also returned when caller lacks permission (e.g. non-owner generating invite link)

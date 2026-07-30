@@ -1,0 +1,190 @@
+ShareCart Spring Boot API Guide: Using GitHub Copilot to Save Confirmed Item Prices After AI Capture and Scan
+
+1. Purpose
+
+This document explains how to use GitHub Copilot effectively in a Spring Boot project to implement API endpoints that persist confirmed item prices after the AI service extracts data from an image.
+
+You already have the target table:
+
+CREATE TABLE item_prices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_name VARCHAR(255) NOT NULL,
+    normalized_name VARCHAR(255), -- for matching (lowercase, cleaned)
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    price DECIMAL(10,2) NOT NULL,
+    unit VARCHAR(50), -- e.g. "1L", "500g", "12 pack"
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    source VARCHAR(50) DEFAULT 'MANUAL', -- MANUAL, OCR, API
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+2. Recommended API Flow
+
+1. Flutter captures image and sends it to AI extraction service.
+2. AI service returns structured JSON (items, price, confidence, store hint).
+3. User reviews and edits values in Flutter.
+4. Flutter sends confirmed values to Spring Boot confirm endpoint.
+5. Spring Boot validates, normalizes names, and saves rows in item_prices.
+
+3. Endpoint to Implement in Spring Boot
+
+A. Confirm item(s) with one endpoint
+1. Method: POST
+2. Path: /api/v1/prices/confirm
+3. Use case: save one or more confirmed items after user validation
+
+Single-item request body example:
+
+{
+  "itemName": "Whole Milk",
+  "price": 4.89,
+  "unit": "1 gallon",
+  "storeId": "3f12e4a0-7db0-4f83-9f61-9b4adf7be321",
+  "source": "API",
+  "capturedAt": "2026-07-06T10:15:30Z"
+}
+
+Response example:
+
+{
+  "id": "7ab7b7b9-ae7e-45dd-9f31-92b5197c5f0c",
+  "message": "Price saved successfully"
+}
+
+Bulk request body example (same endpoint):
+
+Request body example:
+
+{
+  "storeId": "3f12e4a0-7db0-4f83-9f61-9b4adf7be321",
+  "source": "API",
+  "capturedAt": "2026-07-06T10:15:30Z",
+  "items": [
+    { "itemName": "Whole Milk", "price": 4.89, "unit": "1 gallon" },
+    { "itemName": "Brown Eggs", "price": 3.49, "unit": "12 pack" }
+  ]
+}
+
+Response example:
+
+{
+  "savedCount": 2,
+  "ids": [
+    "7ab7b7b9-ae7e-45dd-9f31-92b5197c5f0c",
+    "f297df6b-1138-46fe-949b-6f828db7b17c"
+  ],
+  "message": "Confirmed prices saved"
+}
+
+4. Validation Rules
+
+1. itemName required, min 2 chars.
+2. price required and > 0.
+3. unit optional but recommended.
+4. storeId required for store-level comparison features.
+5. source must be one of MANUAL, OCR, API.
+6. createdBy should come from authenticated JWT user, not client input.
+
+5. Normalization Strategy for normalized_name
+
+Use a shared helper before saving:
+1. lowercase
+2. trim spaces
+3. remove punctuation
+4. collapse multiple spaces
+5. optional synonym mapping (milk 1l vs whole milk 1 litre)
+
+Example:
+1. Input: " Whole-Milk 1L "
+2. Normalized: "whole milk 1l"
+
+This improves matching and price comparisons across stores.
+
+6. Suggested Spring Boot Layers
+
+1. Controller
+2. DTOs (request and response)
+3. Service
+4. Repository
+5. Entity
+6. Mapper/Normalizer utility
+
+Keep business logic in service, not controller.
+
+7. GitHub Copilot Prompt Pack (Use These Prompts Directly)
+
+Prompt 1: Entity
+Create a Spring Boot JPA entity for item_prices with UUID id, itemName, normalizedName, storeId (UUID), price (BigDecimal), unit, capturedAt, source, createdBy, createdAt. Use @Entity, @Table, Hibernate UUID generation, and audit-friendly timestamps.
+
+Prompt 2: Repository
+Create a JpaRepository for ItemPriceEntity with methods:
+1. findTop20ByNormalizedNameAndStoreIdOrderByCapturedAtDesc
+2. findTop20ByNormalizedNameOrderByCapturedAtDesc
+3. findByCreatedByOrderByCreatedAtDesc
+
+Prompt 3: DTOs
+Create request and response DTOs for:
+1. confirm single item
+2. confirm bulk items using the same /api/v1/prices/confirm endpoint
+Add Jakarta validation annotations for required fields and positive price.
+
+Prompt 4: Service
+Create a transactional service method that:
+1. validates store existence
+2. normalizes itemName into normalizedName
+3. maps DTO to entity
+4. sets createdBy from authenticated principal
+5. saves records and returns IDs
+
+Prompt 5: Controller
+Create one REST endpoint:
+1. POST /api/v1/prices/confirm
+It must accept either a single-item payload or a bulk payload (items array).
+Return 201 on success, 400 on validation error, 401 when unauthenticated.
+
+Prompt 6: Security integration
+Show how to extract user UUID from JWT Authentication principal and pass it to service as createdBy.
+
+Prompt 7: Tests
+Create unit tests for service and integration tests for controller covering:
+1. valid save
+2. invalid price
+3. missing itemName
+4. unauthorized request
+5. bulk partial invalid data behavior
+
+8. Service Logic Blueprint
+
+1. Read JWT principal userId.
+2. Validate request DTO.
+3. Resolve storeId (verify exists).
+4. Build normalizedName from itemName.
+5. Set source as API when coming from AI-confirmed flow.
+6. Save row(s) to item_prices.
+7. Return generated UUID(s).
+
+9. Error Handling Contract
+
+1. 400: invalid payload (price <= 0, itemName missing)
+2. 401: missing/invalid JWT
+3. 404: storeId not found
+4. 409: optional duplicate conflict rule if enabled
+5. 500: unexpected server error
+
+10. Production Notes
+
+1. Use BigDecimal for price, never double.
+2. Add DB index on normalized_name, store_id, captured_at for fast comparisons.
+3. Consider idempotency key for retries from mobile.
+4. Use source=API for confirmed AI-assisted entries.
+5. Add audit logs with userId and requestId.
+
+11. Definition of Done
+
+1. One confirm endpoint implemented for both single and bulk requests.
+2. Data stored in item_prices with correct createdBy.
+3. normalized_name generated consistently.
+4. API documented in OpenAPI/Swagger.
+5. Tests passing for controller and service.
+6. Flutter confirm call persists rows successfully.

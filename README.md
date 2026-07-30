@@ -1,7 +1,7 @@
 # ShareCart Spring Boot Backend
 
 ShareCart is a Spring Boot REST API backend for a shared shopping list application.
-It provides JWT-based authentication, collaborative shopping lists, member invitations (by user ID and by link), and item management.
+It provides JWT-based authentication, collaborative shopping lists, member invitations (by user ID and by link), item management, and a price optimization engine for comparing grocery prices across stores.
 
 ## Overview
 
@@ -19,6 +19,12 @@ Current capabilities:
 - Add items to a list
 - Update items
 - Delete items
+- Create a price capture (location + raw text / image)
+- Confirm and save item prices from a capture
+- Compare prices for an item across stores
+- Retrieve personal price history with optional item name filter
+- Find nearby stores by GPS coordinates
+- Create or resolve a store (deduplicates within 200 m)
 
 ## Tech Stack
 
@@ -28,6 +34,8 @@ Current capabilities:
 - Spring Data JPA
 - Spring Validation
 - Spring Security
+- Spring WebSocket (STOMP)
+- Spring Boot Actuator
 - PostgreSQL
 - Hibernate 7
 - Lombok
@@ -48,6 +56,7 @@ Main modules:
 - `shoppinglist`
 - `item`
 - `invite`
+- `price`
 - `realtime`
 - `user`
 - `common.exception`
@@ -73,6 +82,13 @@ src/main/java/com/sharecart/sharecart/
     model/
     repository/
     service/
+  price/
+    controller/
+    dto/
+    model/
+    repository/
+    service/
+    util/
   realtime/
     config/
     dto/
@@ -222,6 +238,58 @@ curl -X POST http://localhost:8080/api/v1/invites/<inviteToken>/accept \
   -H "Authorization: Bearer <token>"
 ```
 
+### Create a Price Capture
+
+```bash
+curl -X POST http://localhost:8080/api/v1/prices/capture \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "rawText": "Whole Milk 3.49"
+  }'
+```
+
+### Confirm Prices from a Capture
+
+```bash
+curl -X POST http://localhost:8080/api/v1/prices/confirm \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "captureId": "<captureId>",
+    "scanType": "MANUAL",
+    "source": "MANUAL",
+    "capturedAt": "2026-07-09T10:00:00Z",
+    "store": {
+      "name": "Trader Joe'\''s",
+      "address": "123 Main St",
+      "latitude": 37.7749,
+      "longitude": -122.4194
+    },
+    "items": [
+      { "itemName": "Whole Milk", "price": 3.49, "unit": "gallon" }
+    ]
+  }'
+```
+
+### Compare Prices for an Item
+
+```bash
+curl -X POST http://localhost:8080/api/v1/prices/compare \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{ "itemName": "Whole Milk" }'
+```
+
+### Find Nearby Stores
+
+```bash
+curl "http://localhost:8080/api/v1/stores/nearby?lat=37.7749&lon=-122.4194" \
+  -H "Authorization: Bearer <token>"
+```
+
 ## Current API Endpoints
 
 ### Auth
@@ -248,6 +316,18 @@ curl -X POST http://localhost:8080/api/v1/invites/<inviteToken>/accept \
 - `PUT /api/v1/items/{id}`
 - `DELETE /api/v1/items/{id}`
 
+### Prices
+
+- `POST /api/v1/prices/capture`
+- `POST /api/v1/prices/confirm`
+- `POST /api/v1/prices/compare`
+- `GET /api/v1/prices/history`
+
+### Stores
+
+- `GET /api/v1/stores/nearby`
+- `POST /api/v1/stores`
+
 ## Important API Notes
 
 - `POST /api/v1/lists` derives the owner from the authenticated JWT user
@@ -256,6 +336,9 @@ curl -X POST http://localhost:8080/api/v1/invites/<inviteToken>/accept \
 - `PUT /api/v1/items/{id}` behaves like a partial update even though it uses PUT
 - `POST /api/v1/lists/{id}/invite` directly adds membership in `list_members`; it is not a pending request workflow
 - Current realtime events are item-only (`ITEM_ADDED`, `ITEM_UPDATED`, `ITEM_DELETED`)
+- `POST /api/v1/prices/confirm` accepts `source` values of `MANUAL`, `OCR`, or `API`
+- `POST /api/v1/stores` deduplicates: if a store with the same name exists within 200 metres it returns the existing record
+- `GET /api/v1/prices/history` accepts an optional `itemName` query param to filter results; matching is case-insensitive and partial
 
 ## Documentation
 
@@ -271,9 +354,15 @@ Detailed docs:
 - `docs/render-deployment-troubleshooting.md`
 - `docs/realtime-websocket-sync.md`
 - `docs/realtime-phase2-change-log.md`
+- `docs/price-optimization-implementation.md`
+- `docs/refactor-ai-priceconfirm.md`
+- `docs/sharecart-ai-api-overview.md`
+- `docs/sharecart-ai-jwt-authentication-guide.md`
 
 ## Development Notes
 
 - The project currently uses `spring.jpa.hibernate.ddl-auto=update` for local schema updates
 - Replace the JWT secret before any production deployment
-- Local datasource credentials in `application.properties` are for development only
+- Local datasource credentials in `application-dev.properties` are for development only
+- SQL logging is enabled in dev (`spring.jpa.show-sql=true`) and disabled in prod
+- Application-level logs use DEBUG level for `com.sharecart` in dev and INFO in prod

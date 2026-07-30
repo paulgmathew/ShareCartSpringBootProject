@@ -105,12 +105,17 @@ public class InviteServiceImpl implements InviteService {
     @Override
     @Transactional(readOnly = true)
     public InvitePreviewResponse getInvitePreview(String token) {
+        log.debug("Fetching invite preview for token");
         InviteToken inviteToken = inviteTokenRepository.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Invite link not found or invalid"));
+                .orElseThrow(() -> {
+                    log.warn("Invite token not found or invalid");
+                    return new ResourceNotFoundException("Invite link not found or invalid");
+                });
 
         ShoppingList list = inviteToken.getShoppingList();
         String ownerName = list.getOwner() != null ? list.getOwner().getName() : null;
 
+        log.info("Invite preview fetched listId={}", list.getId());
         return new InvitePreviewResponse(list.getName(), ownerName);
     }
 }

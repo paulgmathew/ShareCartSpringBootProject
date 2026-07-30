@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 public class ItemController {
@@ -27,7 +29,9 @@ public class ItemController {
     public ResponseEntity<ItemResponse> addItem(
             @PathVariable UUID listId,
             @Valid @RequestBody CreateItemRequest request) {
+        log.info("POST /api/v1/lists/{}/items name={}", listId, request.name());
         ItemResponse created = itemService.addItem(listId, request);
+        log.info("Item added itemId={} listId={}", created.id(), listId);
         URI location = URI.create("/api/v1/items/" + created.id());
         return ResponseEntity.created(location).body(created);
     }
@@ -37,13 +41,18 @@ public class ItemController {
     public ItemResponse updateItem(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateItemRequest request) {
-        return itemService.updateItem(id, request);
+        log.info("PUT /api/v1/items/{}", id);
+        ItemResponse updated = itemService.updateItem(id, request);
+        log.info("Item updated itemId={} listId={}", updated.id(), updated.listId());
+        return updated;
     }
 
     // DELETE /api/v1/items/{id}
     @DeleteMapping("/api/v1/items/{id}")
     public ResponseEntity<Void> deleteItem(@PathVariable UUID id) {
+        log.info("DELETE /api/v1/items/{}", id);
         itemService.deleteItem(id);
+        log.info("Item deleted itemId={}", id);
         return ResponseEntity.noContent().build();
     }
 }
