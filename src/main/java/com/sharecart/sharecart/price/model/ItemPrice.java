@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import com.sharecart.sharecart.item.model.CanonicalItem;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -56,6 +57,10 @@ public class ItemPrice {
 
     @Column(name = "created_by")
     private UUID createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "canonical_item_id")
+    private CanonicalItem canonicalItem;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

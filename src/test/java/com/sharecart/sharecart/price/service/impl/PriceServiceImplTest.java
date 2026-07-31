@@ -9,9 +9,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sharecart.sharecart.common.exception.ResourceNotFoundException;
+import com.sharecart.sharecart.item.model.CanonicalItem;
+import com.sharecart.sharecart.item.repository.CanonicalItemRepository;
+import com.sharecart.sharecart.price.dto.BestPriceSummaryResponse;
+import com.sharecart.sharecart.price.dto.ComparePriceRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceItemRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
 import com.sharecart.sharecart.price.dto.StoreInfoRequest;
+import com.sharecart.sharecart.price.dto.StorePriceResponse;
 import com.sharecart.sharecart.price.model.ItemPrice;
 import com.sharecart.sharecart.price.model.PriceCapture;
 import com.sharecart.sharecart.price.model.Store;
@@ -40,13 +45,16 @@ class PriceServiceImplTest {
     private ItemPriceRepository itemPriceRepository;
 
     @Mock
+    private CanonicalItemRepository canonicalItemRepository;
+
+    @Mock
     private StoreResolverService storeResolverService;
 
     private PriceServiceImpl priceService;
 
     @BeforeEach
     void setUp() {
-        priceService = new PriceServiceImpl(priceCaptureRepository, itemPriceRepository, storeResolverService);
+        priceService = new PriceServiceImpl(priceCaptureRepository, itemPriceRepository, canonicalItemRepository, storeResolverService);
     }
 
     @Test
@@ -71,7 +79,7 @@ class PriceServiceImplTest {
                         "API",
                         OffsetDateTime.parse("2026-04-21T10:05:00Z"),
                         storeInfo,
-                        List.of(new ConfirmPriceItemRequest("Milk (1L)", new BigDecimal("3.49"), "1L"))
+                        List.of(new ConfirmPriceItemRequest("Milk (1L)", new BigDecimal("3.49"), "1L", null))
                 ),
                 userId
         );
@@ -108,12 +116,14 @@ class PriceServiceImplTest {
                                 new ConfirmPriceItemRequest(
                                         "Milk (1L)",
                                         new BigDecimal("3.49"),
-                                        "1L"
+                                        "1L",
+                                        null
                                 ),
                                 new ConfirmPriceItemRequest(
                                         "Eggs",
                                         new BigDecimal("4.29"),
-                                        "12 pack"
+                                        "12 pack",
+                                        null
                                 )
                         )
                 ),
@@ -197,6 +207,157 @@ class PriceServiceImplTest {
         assertEquals("whole milk", response.get(0).normalizedName());
         verify(itemPriceRepository).findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(userId, "milk");
         verify(itemPriceRepository, never()).findByCreatedByOrderByCreatedAtDesc(userId);
+    }
+
+    @Test
+    void shouldAttachCanonicalItemWhenConfirmingPrice() {
+        UUID captureId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID canonicalItemId = UUID.randomUUID();
+        Store store = Store.builder().id(UUID.randomUUID()).name("Walmart").build();
+        StoreInfoRequest storeInfo = new StoreInfoRequest("Walmart", "Dallas", 32.99, -96.70);
+        CanonicalItem canonicalItem = CanonicalItem.builder().id(canonicalItemId).name("Milk").normalizedName("milk").build();
+
+        when(priceCaptureRepository.findById(captureId)).thenReturn(Optional.of(PriceCapture.builder().id(captureId).build()));
+        when(storeResolverService.resolve(storeInfo)).thenReturn(store);
+        when(canonicalItemRepository.findById(canonicalItemId)).thenReturn(Optional.of(canonicalItem));
+        when(itemPriceRepository.save(any(ItemPrice.class))).thenAnswer(invocation -> {
+            ItemPrice itemPrice = invocation.getArgument(0);
+            itemPrice.setId(UUID.randomUUID());
+            return itemPrice;
+        });
+
+        priceService.confirmPrice(
+                new ConfirmPriceRequest(
+                        captureId,
+                        "PRICE_TAG",
+                        "API",
+                        OffsetDateTime.parse("2026-04-21T10:05:00Z"),
+                        storeInfo,
+                        List.of(new ConfirmPriceItemRequest("Milk", new BigDecimal("3.49"), "1L", canonicalItemId))
+                ),
+                userId
+        );
+
+        verify(canonicalItemRepository).findById(canonicalItemId);
+    }
+
+    @Test
+    void shouldComparePricesForCurrentUserOnly() {
+        UUID userId = UUID.randomUUID();
+        Store store = Store.builder().id(UUID.randomUUID()).name("Walmart").build();
+        ItemPrice milk = ItemPrice.builder()
+                .id(UUID.randomUUID())
+                .itemName("Milk")
+                .normalizedName("milk")
+                .store(store)
+                .price(new BigDecimal("3.49"))
+                .createdBy(userId)
+                .build();
+
+        when(itemPriceRepository.findByNormalizedNameAndCreatedBy("milk", userId)).thenReturn(List.of(milk));
+
+        var response = priceService.comparePrice(new ComparePriceRequest("Milk"), userId);
+
+        assertEquals(new BigDecimal("3.49"), response.lowestPrice());
+        verify(itemPriceRepository).findByNormalizedNameAndCreatedBy("milk", userId);
+    }
+
+    @Test
+    void shouldReturnLowestPriceByStore() {
+        UUID userId = UUID.randomUUID();
+        UUID canonicalItemId = UUID.randomUUID();
+        List<StorePriceResponse> rows = List.of(
+                new StorePriceResponse(UUID.randomUUID(), "Store A", new BigDecimal("3.10")),
+                new StorePriceResponse(UUID.randomUUID(), "Store B", new BigDecimal("3.50"))
+        );
+
+        when(canonicalItemRepository.existsById(canonicalItemId)).thenReturn(true);
+        when(itemPriceRepository.findLowestPriceByStoreForUserAndCanonicalItem(userId, canonicalItemId)).thenReturn(rows);
+
+        var response = priceService.getLowestPriceByStore(userId, canonicalItemId);
+
+        assertEquals(2, response.size());
+        assertEquals("Store A", response.get(0).storeName());
+        verify(itemPriceRepository).findLowestPriceByStoreForUserAndCanonicalItem(userId, canonicalItemId);
+    }
+
+    @Test
+    void shouldReturnBestPriceSummaryForCanonicalItemsOnly() {
+        UUID userId = UUID.randomUUID();
+        UUID canonicalItemId = UUID.randomUUID();
+        UUID storeAId = UUID.randomUUID();
+        UUID storeBId = UUID.randomUUID();
+
+        ItemPriceRepository.BestPriceSummaryRow storeBRow = bestPriceSummaryRow(
+                canonicalItemId,
+                "Milk",
+                storeBId,
+                "Store B",
+                new BigDecimal("3.50")
+        );
+        ItemPriceRepository.BestPriceSummaryRow storeARow = bestPriceSummaryRow(
+                canonicalItemId,
+                "Milk",
+                storeAId,
+                "Store A",
+                new BigDecimal("3.10")
+        );
+        ItemPriceRepository.BestPriceSummaryRow ignoredNullCanonicalRow = bestPriceSummaryRow(
+                null,
+                null,
+                UUID.randomUUID(),
+                "Ignored Store",
+                new BigDecimal("1.00")
+        );
+
+        when(itemPriceRepository.findBestPriceSummaryRowsByUserId(userId))
+                .thenReturn(List.of(storeBRow, storeARow, ignoredNullCanonicalRow));
+
+        List<BestPriceSummaryResponse> response = priceService.getBestPriceSummary(userId);
+
+        assertEquals(1, response.size());
+        assertEquals(canonicalItemId, response.get(0).canonicalItemId());
+        assertEquals("Milk", response.get(0).itemName());
+        assertEquals(new BigDecimal("3.10"), response.get(0).lowestPrice());
+        assertEquals(storeAId, response.get(0).storeId());
+        assertEquals("Store A", response.get(0).storeName());
+        verify(itemPriceRepository).findBestPriceSummaryRowsByUserId(userId);
+    }
+
+    private ItemPriceRepository.BestPriceSummaryRow bestPriceSummaryRow(
+            UUID canonicalItemId,
+            String itemName,
+            UUID storeId,
+            String storeName,
+            BigDecimal lowestPrice
+    ) {
+        return new ItemPriceRepository.BestPriceSummaryRow() {
+            @Override
+            public UUID getCanonicalItemId() {
+                return canonicalItemId;
+            }
+
+            @Override
+            public String getItemName() {
+                return itemName;
+            }
+
+            @Override
+            public UUID getStoreId() {
+                return storeId;
+            }
+
+            @Override
+            public String getStoreName() {
+                return storeName;
+            }
+
+            @Override
+            public BigDecimal getLowestPrice() {
+                return lowestPrice;
+            }
+        };
     }
 
     @Test

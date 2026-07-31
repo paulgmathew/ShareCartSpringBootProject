@@ -2,6 +2,7 @@ package com.sharecart.sharecart.price.controller;
 
 import com.sharecart.sharecart.price.dto.ComparePriceRequest;
 import com.sharecart.sharecart.price.dto.ComparePriceResponse;
+import com.sharecart.sharecart.price.dto.BestPriceSummaryResponse;
 import com.sharecart.sharecart.price.dto.ConfirmPriceRequest;
 import com.sharecart.sharecart.price.dto.ConfirmPriceResponse;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureRequest;
@@ -53,10 +54,25 @@ public class PriceController {
     //not used 
     @PostMapping("/compare")
     public ResponseEntity<ComparePriceResponse> comparePrice(@Valid @RequestBody ComparePriceRequest request) {
-        log.info("POST /api/v1/prices/compare itemName={}", request.itemName());
-        ComparePriceResponse response = priceService.comparePrice(request);
-        log.info("Price comparison result itemName={} lowestPrice={} totalEntries={}", request.itemName(), response.lowestPrice(), response.totalEntries());
+        UUID userId = UUID.fromString((String) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        log.info("POST /api/v1/prices/compare itemName={} userId={}", request.itemName(), userId);
+        ComparePriceResponse response = priceService.comparePrice(request, userId);
+        log.info("Price comparison result itemName={} lowestPrice={} totalEntries={} userId={}", request.itemName(), response.lowestPrice(), response.totalEntries(), userId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/best-store/{canonicalItemId}")
+    public ResponseEntity<List<com.sharecart.sharecart.price.dto.StorePriceResponse>> getLowestPriceByStore(@PathVariable UUID canonicalItemId) {
+        UUID userId = UUID.fromString((String) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        log.info("GET /api/v1/prices/best-store/{} userId={}", canonicalItemId, userId);
+        return ResponseEntity.ok(priceService.getLowestPriceByStore(userId, canonicalItemId));
+    }
+
+    @GetMapping("/best-prices")
+    public ResponseEntity<List<BestPriceSummaryResponse>> getBestPriceSummary() {
+        UUID userId = UUID.fromString((String) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        log.info("GET /api/v1/prices/best-prices userId={}", userId);
+        return ResponseEntity.ok(priceService.getBestPriceSummary(userId));
     }
 
     @GetMapping("/history")

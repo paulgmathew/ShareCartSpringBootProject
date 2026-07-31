@@ -102,6 +102,7 @@ Mapped fields:
 - `capturedAt` -> `captured_at`
 - `source`
 - `createdBy` -> `created_by`
+- `canonicalItem` -> `canonical_item_id`
 - `createdAt` -> `created_at`
 
 File: `src/main/java/com/sharecart/sharecart/price/model/ItemPrice.java`
@@ -130,6 +131,11 @@ Added:
 
 - `List<ItemPrice> findByNormalizedName(String normalizedName)`
 - `Optional<ItemPrice> findTopByNormalizedNameAndStoreIdOrderByCreatedAtDesc(String normalizedName, UUID storeId)`
+- `List<ItemPrice> findByCreatedByOrderByCreatedAtDesc(UUID createdBy)`
+- `List<ItemPrice> findByCreatedByAndNormalizedNameContainingOrderByCreatedAtDesc(UUID createdBy, String normalizedName)`
+- `List<ItemPrice> findByNormalizedNameAndCreatedBy(String normalizedName, UUID createdBy)`
+- `List<StorePriceResponse> findLowestPriceByStoreForUserAndCanonicalItem(UUID userId, UUID canonicalItemId)`
+- `List<BestPriceSummaryRow> findBestPriceSummaryRowsByUserId(UUID userId)`
 
 ### PriceCaptureRepository
 
@@ -192,29 +198,35 @@ Example behavior:
 3. `confirmPrice(request, userId)`
 - Validates capture exists (404 if missing)
 - Normalizes item name
-- Resolves store by `storeName + latitude + longitude` (no `storeId` from client)
-- Dedup logic:
-  - Finds latest same `normalized_name + store_id`
-  - If same price and created within 24 hours, returns existing row
-- Otherwise inserts new `item_prices` row:
+- Resolves store using the store details payload and store service
+- Persists one `item_prices` row per confirmed item:
   - `item_name`
   - `normalized_name`
   - `store_id`
   - `price` (`BigDecimal`)
   - `unit`
-  - `source = OCR`
+  - `source`
   - `created_by` from JWT
+  - `canonical_item_id` when provided
   - `captured_at = now`
 
-4. `comparePrice(request)`
+4. `comparePrice(request, userId)`
 - Normalizes item name
-- Fetches all entries by `normalized_name`
+- Fetches entries by `normalized_name` and `created_by`
 - Computes:
   - `lowestPrice`
   - `lowestStoreId`
   - `averagePrice`
   - `totalEntries`
 - Returns 404 if no matching entries
+
+5. `getLowestPriceByStore(userId, canonicalItemId)`
+- Returns the minimum price per store for one canonical item within the authenticated user’s history
+
+6. `getBestPriceSummary(userId)`
+- Returns one summary row per canonical item captured by the authenticated user
+- Collapses multiple store rows down to a single cheapest row per canonical item
+- Excludes price rows without a canonical item
 
 ---
 
@@ -246,12 +258,57 @@ Endpoints:
 
 2. `POST /api/v1/prices/confirm`
 - Auth required
-- Confirms parsed OCR price into canonical `item_prices`
-- Does not accept `storeId` from client
+- Confirms parsed price data into canonical `item_prices`
+- Accepts store details and optional canonical item linkage
 
 3. `POST /api/v1/prices/compare`
 - Auth required
-- Returns aggregate price comparison
+- Returns aggregate price comparison scoped to the authenticated user
+
+4. `GET /api/v1/prices/best-store/{canonicalItemId}`
+- Auth required
+- Returns lowest prices per store for one canonical item
+
+5. `GET /api/v1/prices/best-prices`
+- Auth required
+- Returns the lowest price summary view across all canonical items for the authenticated user
+
+6. `GET /api/v1/prices/history`
+- Auth required
+- Returns the authenticated user’s price history
+
+7. `DELETE /api/v1/prices/history/{id}`
+- Auth required
+- Deletes the authenticated user’s own price history entry only
+
+## DTO Contracts Added
+
+Files in `src/main/java/com/sharecart/sharecart/price/dto/`:
+
+- `BestPriceSummaryResponse`
+- `CreateStoreRequest`
+- `StoreResponse`
+- `NearbyStoreResponse`
+- `CreatePriceCaptureRequest`
+- `CreatePriceCaptureResponse`
+- `ConfirmPriceRequest`
+- `ConfirmPriceItemRequest`
+- `StoreInfoRequest`
+- `ItemPriceResponse`
+- `ComparePriceRequest`
+- `ComparePriceResponse`
+
+Validation annotations are applied on request DTOs for required fields and valid numeric constraints.
+
+## Related Item and User Changes
+
+Added for this feature:
+
+- canonical item catalog at `src/main/java/com/sharecart/sharecart/item/`
+- `canonicalItem` relationship on `ItemPrice`
+- `homeLatitude` and `homeLongitude` fields on `User`
+- `GET /api/v1/users/me/location`
+- `PATCH /api/v1/users/me/location`
 
 JWT user extraction:
 
@@ -259,22 +316,6 @@ JWT user extraction:
 - `created_by` is never accepted from request payload
 
 ---
-
-## DTO Contracts Added
-
-Files in `src/main/java/com/sharecart/sharecart/price/dto/`:
-
-- `CreateStoreRequest`
-- `StoreResponse`
-- `NearbyStoreResponse`
-- `CreatePriceCaptureRequest`
-- `CreatePriceCaptureResponse`
-- `ConfirmPriceRequest`
-- `ItemPriceResponse`
-- `ComparePriceRequest`
-- `ComparePriceResponse`
-
-Validation annotations are applied on request DTOs for required fields and valid numeric constraints.
 
 ---
 
