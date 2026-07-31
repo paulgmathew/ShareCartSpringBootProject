@@ -3,6 +3,8 @@ package com.sharecart.sharecart.common.exception;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,10 +13,46 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(
+        HttpRequestMethodNotSupportedException ex,
+        HttpServletRequest request
+    ) {
+    String supportedMethods = ex.getSupportedHttpMethods() == null
+        ? "none"
+        : ex.getSupportedHttpMethods().stream()
+        .map(Enum::name)
+        .collect(Collectors.joining(", "));
+
+    String requestUri = request.getRequestURI();
+    String query = request.getQueryString();
+    String fullPath = query == null ? requestUri : requestUri + "?" + query;
+
+    log.warn(
+        "Method not supported method={} path={} supportedMethods={} error={}",
+        request.getMethod(),
+        fullPath,
+        supportedMethods,
+        ex.getMessage()
+    );
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("timestamp", Instant.now());
+    body.put("status", HttpStatus.METHOD_NOT_ALLOWED.value());
+    body.put("error", HttpStatus.METHOD_NOT_ALLOWED.getReasonPhrase());
+    body.put("message", ex.getMessage());
+    body.put("path", fullPath);
+    body.put("method", request.getMethod());
+    body.put("supportedMethods", ex.getSupportedMethods() == null ? new String[0] : ex.getSupportedMethods());
+
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {

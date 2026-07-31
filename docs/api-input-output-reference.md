@@ -814,6 +814,8 @@ Common errors:
 
 ## 15.1) Canonical Item Catalog
 
+### Create Canonical Item
+
 Endpoint:
 
 POST /api/v1/catalog/items
@@ -845,6 +847,49 @@ Common errors:
 
 1. 400 Bad Request (validation)
 2. 403 Forbidden (missing/invalid/expired token)
+
+### List Canonical Items
+
+Endpoint:
+
+GET /api/v1/catalog/items?query={optionalSearch}
+
+Auth:
+
+Yes
+
+Query params:
+
+1. query: optional string used to filter canonical items by normalized name
+
+Success:
+
+1. Status: 200 OK
+2. Body: array of CanonicalItemResponse
+
+Behavior:
+
+1. if query is omitted/blank, all canonical items are returned
+2. if provided, backend normalizes the query and filters by normalized name
+
+### Get Canonical Item By ID
+
+Endpoint:
+
+GET /api/v1/catalog/items/{id}
+
+Auth:
+
+Yes
+
+Path params:
+
+1. id: UUID (canonical item id)
+
+Success:
+
+1. Status: 200 OK
+2. Body: CanonicalItemResponse
 
 ### CanonicalItemResponse
 
@@ -1087,6 +1132,42 @@ Behavior:
 2. rows are sorted alphabetically by item name
 3. rows without canonical items are excluded
 
+### Best store prices endpoint
+
+```text
+GET /api/v1/prices/best-store/{canonicalItemId}
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. returns the lowest price per store for the specified canonical item
+2. requires the authenticated user to have captured price data for that item
+
+### Price history endpoint
+
+```text
+GET /api/v1/prices/history?itemName={optionalFilter}
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. returns the authenticated user's price history entries
+2. itemName is optional and filters by normalized item name
+
+### Delete price history entry
+
+```text
+DELETE /api/v1/prices/history/{id}
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. deletes a single price history entry owned by the authenticated user
+2. returns 204 No Content on success
+
 ## 17) Compare Price
 
 Endpoint:
@@ -1122,6 +1203,7 @@ Success:
 {
   "lowestPrice": 3.49,
   "lowestStoreId": "77777777-7777-7777-7777-777777777777",
+  "lowestStoreName": "Walmart",
   "averagePrice": 3.89,
   "totalEntries": 12
 }
@@ -1286,6 +1368,7 @@ Common errors:
 {
   "lowestPrice": "decimal",
   "lowestStoreId": "uuid",
+  "lowestStoreName": "string",
   "averagePrice": "decimal",
   "totalEntries": "number"
 }
