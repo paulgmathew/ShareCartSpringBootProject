@@ -131,6 +131,7 @@ public class PriceServiceImpl implements PriceService {
         return new ComparePriceResponse(
                 lowest.getPrice(),
                 lowest.getStore().getId(),
+            lowest.getStore().getName(),
                 average,
                 entries.size()
         );

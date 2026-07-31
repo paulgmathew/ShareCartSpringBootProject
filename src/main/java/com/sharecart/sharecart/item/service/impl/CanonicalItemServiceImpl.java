@@ -22,19 +22,28 @@ public class CanonicalItemServiceImpl implements CanonicalItemService {
     @Override
     public CanonicalItemResponse createCanonicalItem(CreateCanonicalItemRequest request) {
         String normalizedName = normalizeName(request.name());
-        CanonicalItem entity = CanonicalItem.builder()
-                .name(request.name().trim())
-                .normalizedName(normalizedName)
-                .description(request.description())
-                .build();
-        CanonicalItem saved = canonicalItemRepository.save(entity);
-        return toResponse(saved);
+        return canonicalItemRepository.findByNormalizedName(normalizedName)
+                .map(this::toResponse)
+                .orElseGet(() -> {
+                    CanonicalItem entity = CanonicalItem.builder()
+                            .name(request.name().trim())
+                            .normalizedName(normalizedName)
+                            .description(request.description())
+                            .build();
+                    return toResponse(canonicalItemRepository.save(entity));
+                });
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<CanonicalItemResponse> listCanonicalItems() {
-        return canonicalItemRepository.findAll().stream().map(this::toResponse).toList();
+    public List<CanonicalItemResponse> listCanonicalItems(String query) {
+        String normalizedQuery = normalizeName(query);
+        if (normalizedQuery.isBlank()) {
+            return canonicalItemRepository.findAll().stream().map(this::toResponse).toList();
+        }
+        return canonicalItemRepository.findByNormalizedNameContaining(normalizedQuery).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Override

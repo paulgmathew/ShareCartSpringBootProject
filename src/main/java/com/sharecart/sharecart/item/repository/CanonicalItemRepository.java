@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface CanonicalItemRepository extends JpaRepository<CanonicalItem, UUID> {
 
     Optional<CanonicalItem> findByNormalizedName(String normalizedName);
+
+    java.util.List<CanonicalItem> findByNormalizedNameContaining(String normalizedName);
 }

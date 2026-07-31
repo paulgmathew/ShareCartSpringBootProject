@@ -260,6 +260,7 @@ class PriceServiceImplTest {
         var response = priceService.comparePrice(new ComparePriceRequest("Milk"), userId);
 
         assertEquals(new BigDecimal("3.49"), response.lowestPrice());
+        assertEquals("Walmart", response.lowestStoreName());
         verify(itemPriceRepository).findByNormalizedNameAndCreatedBy("milk", userId);
     }
 

@@ -7,6 +7,6 @@ import java.util.UUID;
 
 public interface CanonicalItemService {
     CanonicalItemResponse createCanonicalItem(CreateCanonicalItemRequest request);
-    List<CanonicalItemResponse> listCanonicalItems();
+    List<CanonicalItemResponse> listCanonicalItems(String query);
     CanonicalItemResponse getCanonicalItem(UUID id);
 }

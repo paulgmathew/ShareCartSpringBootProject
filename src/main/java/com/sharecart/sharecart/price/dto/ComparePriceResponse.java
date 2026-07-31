@@ -6,6 +6,7 @@ import java.util.UUID;
 public record ComparePriceResponse(
         BigDecimal lowestPrice,
         UUID lowestStoreId,
+        String lowestStoreName,
         BigDecimal averagePrice,
         long totalEntries
 ) {
