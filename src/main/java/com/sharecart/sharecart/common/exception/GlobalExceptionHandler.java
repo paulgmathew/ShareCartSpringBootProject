@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
     String supportedMethods = ex.getSupportedHttpMethods() == null
         ? "none"
         : ex.getSupportedHttpMethods().stream()
-        .map(Enum::name)
+        .map(org.springframework.http.HttpMethod::name)
         .collect(Collectors.joining(", "));
 
     String requestUri = request.getRequestURI();
