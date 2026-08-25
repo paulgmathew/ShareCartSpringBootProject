@@ -44,6 +44,12 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "home_latitude")
+    private Double homeLatitude;
+
+    @Column(name = "home_longitude")
+    private Double homeLongitude;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

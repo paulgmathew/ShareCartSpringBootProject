@@ -812,6 +812,140 @@ Common errors:
 
 ---
 
+## 15.1) Canonical Item Catalog
+
+### Create Canonical Item
+
+Endpoint:
+
+POST /api/v1/catalog/items
+
+Auth:
+
+Yes
+
+Request body:
+
+```json
+{
+  "name": "Milk",
+  "description": "Any 1L milk product"
+}
+```
+
+Validation:
+
+1. name: required, not blank
+2. description: optional
+
+Success:
+
+1. Status: 201 Created
+2. Body: CanonicalItemResponse
+
+Common errors:
+
+1. 400 Bad Request (validation)
+2. 403 Forbidden (missing/invalid/expired token)
+
+### List Canonical Items
+
+Endpoint:
+
+GET /api/v1/catalog/items?query={optionalSearch}
+
+Auth:
+
+Yes
+
+Query params:
+
+1. query: optional string used to filter canonical items by normalized name
+
+Success:
+
+1. Status: 200 OK
+2. Body: array of CanonicalItemResponse
+
+Behavior:
+
+1. if query is omitted/blank, all canonical items are returned
+2. if provided, backend normalizes the query and filters by normalized name
+
+### Get Canonical Item By ID
+
+Endpoint:
+
+GET /api/v1/catalog/items/{id}
+
+Auth:
+
+Yes
+
+Path params:
+
+1. id: UUID (canonical item id)
+
+Success:
+
+1. Status: 200 OK
+2. Body: CanonicalItemResponse
+
+### CanonicalItemResponse
+
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "normalizedName": "string",
+  "description": "string or null"
+}
+```
+
+---
+
+## 15.2) User Home Location
+
+Endpoint:
+
+GET /api/v1/users/me/location
+
+PATCH /api/v1/users/me/location
+
+Auth:
+
+Yes
+
+PATCH request body:
+
+```json
+{
+  "latitude": 32.99,
+  "longitude": -96.70
+}
+```
+
+Validation:
+
+1. latitude: required
+2. longitude: required
+
+Success:
+
+1. Status: 200 OK
+2. Body: UserLocationResponse
+
+### UserLocationResponse
+
+```json
+{
+  "latitude": 32.99,
+  "longitude": -96.70
+}
+```
+
+---
+
 ## 16) Confirm Price
 
 Endpoint:
@@ -826,12 +960,24 @@ Request body, single-item mode:
 
 ```json
 {
-  "storeId": "77777777-7777-7777-7777-777777777777",
+  "captureId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "scanType": "RECEIPT",
   "source": "API",
   "capturedAt": "2026-04-21T10:05:00Z",
-  "itemName": "Milk (1L)",
-  "price": 3.49,
-  "unit": "1L"
+  "store": {
+    "name": "Fresh Mart",
+    "address": "MG Road",
+    "latitude": 9.9312,
+    "longitude": 76.2673
+  },
+  "items": [
+    {
+      "itemName": "Milk (1L)",
+      "price": 3.49,
+      "unit": "1L",
+      "canonicalItemId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    }
+  ]
 }
 ```
 
@@ -839,19 +985,28 @@ Request body, bulk mode:
 
 ```json
 {
-  "storeId": "77777777-7777-7777-7777-777777777777",
+  "captureId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "scanType": "RECEIPT",
   "source": "API",
   "capturedAt": "2026-04-21T10:05:00Z",
+  "store": {
+    "name": "Fresh Mart",
+    "address": "MG Road",
+    "latitude": 9.9312,
+    "longitude": 76.2673
+  },
   "items": [
     {
       "itemName": "Milk (1L)",
       "price": 3.49,
-      "unit": "1L"
+      "unit": "1L",
+      "canonicalItemId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     },
     {
       "itemName": "Eggs",
       "price": 4.29,
-      "unit": "12 pack"
+      "unit": "12 pack",
+      "canonicalItemId": null
     }
   ]
 }
@@ -859,20 +1014,24 @@ Request body, bulk mode:
 
 Validation:
 
-1. storeId: required
-2. source: required, one of MANUAL, OCR, API
-3. capturedAt: required
-4. single mode: itemName and price required
-5. bulk mode: items array required with non-empty itemName and price on each item
-6. price must be > 0
+1. captureId: required
+2. scanType: required
+3. source: required, one of MANUAL, OCR, API
+4. capturedAt: required
+5. store.name, store.latitude, and store.longitude: required
+6. items array required and must contain at least one item
+7. each item requires itemName and price
+8. price must be > 0
+9. canonicalItemId is optional on each item
 
 Important behavior:
 
-1. storeId is resolved directly on the backend
+1. store details are resolved directly on the backend
 2. backend normalizes item names before saving
 3. createdBy is derived from JWT
-4. single requests return one saved id
-5. bulk requests return a count plus all saved ids
+4. canonicalItemId is linked when provided
+5. single requests return one saved id
+6. bulk requests return a count plus all saved ids
 
 Success:
 
@@ -907,7 +1066,7 @@ Common errors:
 
 1. 400 Bad Request (validation or invalid price/item)
 2. 403 Forbidden (missing/invalid/expired token)
-3. 404 Not Found (store not found)
+3. 404 Not Found (captureId not found, or canonicalItemId not found when provided)
 4. 401 Unauthorized (missing or invalid auth)
 
 ---
@@ -927,21 +1086,102 @@ Common errors:
 
 ```json
 {
-  "storeId": "uuid",
+  "captureId": "uuid",
+  "scanType": "RECEIPT|PRICE_TAG",
   "source": "MANUAL|OCR|API",
   "capturedAt": "ISO offset datetime",
-  "itemName": "string or null",
-  "price": "decimal or null",
-  "unit": "string or null",
+  "store": {
+    "name": "string",
+    "address": "string or null",
+    "latitude": "double",
+    "longitude": "double"
+  },
   "items": [
     {
       "itemName": "string",
       "price": "decimal",
-      "unit": "string or null"
+      "unit": "string or null",
+      "canonicalItemId": "uuid or null"
     }
   ]
 }
 ```
+
+### BestPriceSummaryResponse
+
+```json
+{
+  "canonicalItemId": "uuid",
+  "itemName": "string",
+  "lowestPrice": "decimal",
+  "storeId": "uuid",
+  "storeName": "string"
+}
+```
+
+### Best prices endpoint
+
+```text
+GET /api/v1/prices/best-prices
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. returns one row per canonical item captured by the authenticated user
+2. rows are sorted alphabetically by item name
+3. rows without canonical items are excluded
+
+### Best store prices endpoint
+
+```text
+GET /api/v1/prices/best-store/{canonicalItemId}
+Authorization: Bearer <token>
+```
+
+Response:
+
+1. Status: 200 OK
+2. Body: array of StorePriceResponse
+
+```json
+[
+  {
+    "storeId": "77777777-7777-7777-7777-777777777777",
+    "storeName": "Walmart",
+    "price": 3.49
+  }
+]
+```
+
+Behavior:
+
+1. returns the lowest price per store for the specified canonical item
+2. requires the authenticated user to have captured price data for that item
+
+### Price history endpoint
+
+```text
+GET /api/v1/prices/history?itemName={optionalFilter}
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. returns the authenticated user's price history entries
+2. itemName is optional and filters by normalized item name
+
+### Delete price history entry
+
+```text
+DELETE /api/v1/prices/history/{id}
+Authorization: Bearer <token>
+```
+
+Behavior:
+
+1. deletes a single price history entry owned by the authenticated user
+2. returns 204 No Content on success
 
 ## 17) Compare Price
 
@@ -978,6 +1218,7 @@ Success:
 {
   "lowestPrice": 3.49,
   "lowestStoreId": "77777777-7777-7777-7777-777777777777",
+  "lowestStoreName": "Walmart",
   "averagePrice": 3.89,
   "totalEntries": 12
 }
@@ -1136,12 +1377,23 @@ Common errors:
 }
 ```
 
+### StorePriceResponse
+
+```json
+{
+  "storeId": "uuid",
+  "storeName": "string",
+  "price": "decimal"
+}
+```
+
 ### ComparePriceResponse
 
 ```json
 {
   "lowestPrice": "decimal",
   "lowestStoreId": "uuid",
+  "lowestStoreName": "string",
   "averagePrice": "decimal",
   "totalEntries": "number"
 }

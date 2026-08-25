@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public record ConfirmPriceItemRequest(
         @NotBlank(message = "Item name is required") String itemName,
         @NotNull(message = "Price is required") @DecimalMin(value = "0.01", message = "Price must be greater than zero") BigDecimal price,
-        String unit
+        String unit,
+        java.util.UUID canonicalItemId
 ) {
 }

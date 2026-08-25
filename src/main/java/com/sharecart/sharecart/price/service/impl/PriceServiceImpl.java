@@ -1,6 +1,9 @@
 package com.sharecart.sharecart.price.service.impl;
 
 import com.sharecart.sharecart.common.exception.ResourceNotFoundException;
+import com.sharecart.sharecart.item.model.CanonicalItem;
+import com.sharecart.sharecart.item.repository.CanonicalItemRepository;
+import com.sharecart.sharecart.price.dto.BestPriceSummaryResponse;
 import com.sharecart.sharecart.price.dto.ComparePriceRequest;
 import com.sharecart.sharecart.price.dto.ComparePriceResponse;
 import com.sharecart.sharecart.price.dto.ConfirmPriceItemRequest;
@@ -9,6 +12,7 @@ import com.sharecart.sharecart.price.dto.ConfirmPriceResponse;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureRequest;
 import com.sharecart.sharecart.price.dto.CreatePriceCaptureResponse;
 import com.sharecart.sharecart.price.dto.ItemPriceResponse;
+import com.sharecart.sharecart.price.dto.StorePriceResponse;
 import com.sharecart.sharecart.price.model.ItemPrice;
 import com.sharecart.sharecart.price.model.PriceCapture;
 import com.sharecart.sharecart.price.model.Store;
@@ -21,8 +25,10 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +43,7 @@ public class PriceServiceImpl implements PriceService {
 
     private final PriceCaptureRepository priceCaptureRepository;
     private final ItemPriceRepository itemPriceRepository;
+    private final CanonicalItemRepository canonicalItemRepository;
     private final StoreResolverService storeResolverService;
 
     @Override
@@ -100,10 +107,10 @@ public class PriceServiceImpl implements PriceService {
 
     @Override
     @Transactional(readOnly = true)
-    public ComparePriceResponse comparePrice(ComparePriceRequest request) {
+    public ComparePriceResponse comparePrice(ComparePriceRequest request, UUID userId) {
         String normalizedName = normalizeItemName(request.itemName());
-        log.debug("Comparing prices normalizedName={}", normalizedName);
-        List<ItemPrice> entries = itemPriceRepository.findByNormalizedName(normalizedName);
+        log.debug("Comparing prices normalizedName={} userId={}", normalizedName, userId);
+        List<ItemPrice> entries = itemPriceRepository.findByNormalizedNameAndCreatedBy(normalizedName, userId);
 
         if (entries.isEmpty()) {
             log.warn("No prices found for item normalizedName={}", normalizedName);
@@ -120,10 +127,11 @@ public class PriceServiceImpl implements PriceService {
 
         BigDecimal average = total.divide(BigDecimal.valueOf(entries.size()), 2, RoundingMode.HALF_UP);
 
-        log.info("Price comparison normalizedName={} lowestPrice={} avgPrice={} entryCount={}", normalizedName, lowest.getPrice(), average, entries.size());
+        log.info("Price comparison normalizedName={} lowestPrice={} avgPrice={} entryCount={} userId={}", normalizedName, lowest.getPrice(), average, entries.size(), userId);
         return new ComparePriceResponse(
                 lowest.getPrice(),
                 lowest.getStore().getId(),
+            lowest.getStore().getName(),
                 average,
                 entries.size()
         );
@@ -148,6 +156,47 @@ public class PriceServiceImpl implements PriceService {
         log.info("Price history fetched userId={} resultCount={}", userId, entries.size());
         return entries.stream()
                 .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StorePriceResponse> getLowestPriceByStore(UUID userId, UUID canonicalItemId) {
+        if (!canonicalItemRepository.existsById(canonicalItemId)) {
+            throw new ResourceNotFoundException("Canonical item not found with id: " + canonicalItemId);
+        }
+        return itemPriceRepository.findLowestPriceByStoreForUserAndCanonicalItem(userId, canonicalItemId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BestPriceSummaryResponse> getBestPriceSummary(UUID userId) {
+        List<ItemPriceRepository.BestPriceSummaryRow> rows = itemPriceRepository.findBestPriceSummaryRowsByUserId(userId);
+        Map<UUID, BestPriceSummaryResponse> bestByCanonicalItem = new LinkedHashMap<>();
+
+        for (ItemPriceRepository.BestPriceSummaryRow row : rows) {
+            if (row.getCanonicalItemId() == null) {
+                continue;
+            }
+
+            BestPriceSummaryResponse candidate = new BestPriceSummaryResponse(
+                    row.getCanonicalItemId(),
+                    row.getItemName(),
+                    row.getLowestPrice(),
+                    row.getStoreId(),
+                    row.getStoreName()
+            );
+
+            bestByCanonicalItem.merge(
+                    row.getCanonicalItemId(),
+                    candidate,
+                    (current, incoming) -> isBetterBestPrice(incoming, current) ? incoming : current
+            );
+        }
+
+        return bestByCanonicalItem.values().stream()
+                .sorted(Comparator.comparing(BestPriceSummaryResponse::itemName, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(BestPriceSummaryResponse::canonicalItemId))
                 .toList();
     }
 
@@ -194,6 +243,12 @@ public class PriceServiceImpl implements PriceService {
             throw new IllegalArgumentException("Item name is required");
         }
 
+        CanonicalItem canonicalItem = null;
+        if (item.canonicalItemId() != null) {
+            canonicalItem = canonicalItemRepository.findById(item.canonicalItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Canonical item not found with id: " + item.canonicalItemId()));
+        }
+
         return itemPriceRepository.save(ItemPrice.builder()
                 .itemName(item.itemName().trim())
                 .normalizedName(normalizedName)
@@ -202,6 +257,7 @@ public class PriceServiceImpl implements PriceService {
                 .unit(item.unit())
                 .source(source)
                 .createdBy(userId)
+                .canonicalItem(canonicalItem)
                 .capturedAt(capturedAt)
                 .build());
     }
@@ -213,5 +269,19 @@ public class PriceServiceImpl implements PriceService {
         }
 
         return normalizedSource;
+    }
+
+    private boolean isBetterBestPrice(BestPriceSummaryResponse candidate, BestPriceSummaryResponse current) {
+        int priceComparison = candidate.lowestPrice().compareTo(current.lowestPrice());
+        if (priceComparison != 0) {
+            return priceComparison < 0;
+        }
+
+        int storeNameComparison = candidate.storeName().compareToIgnoreCase(current.storeName());
+        if (storeNameComparison != 0) {
+            return storeNameComparison < 0;
+        }
+
+        return candidate.storeId().compareTo(current.storeId()) < 0;
     }
 }

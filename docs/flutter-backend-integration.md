@@ -14,8 +14,11 @@ It includes JWT auth, list retrieval for the logged-in user, and the latest endp
 - Add, update, and delete list items
 - Generate and accept invite links
 - Preview invite links without login
+- Manage canonical item catalog entries
 - Capture, confirm, compare, and view price history
+- Fetch best-price summaries for canonical items
 - Discover nearby stores and register stores
+- Manage the logged-in user's home location
 
 ---
 
@@ -79,9 +82,16 @@ Store `token` securely (for example `flutter_secure_storage`) and attach it to e
 13. `POST /api/v1/prices/capture`
 14. `POST /api/v1/prices/confirm`
 15. `POST /api/v1/prices/compare`
-16. `GET /api/v1/prices/history`
-17. `GET /api/v1/stores/nearby`
-18. `POST /api/v1/stores`
+16. `GET /api/v1/prices/best-store/{canonicalItemId}`
+17. `GET /api/v1/prices/best-prices`
+18. `GET /api/v1/prices/history`
+19. `GET /api/v1/stores/nearby`
+20. `POST /api/v1/stores`
+21. `GET /api/v1/users/me/location`
+22. `PATCH /api/v1/users/me/location`
+23. `POST /api/v1/catalog/items`
+24. `GET /api/v1/catalog/items`
+25. `GET /api/v1/catalog/items/{id}`
 
 ---
 
@@ -119,6 +129,81 @@ Returns all lists accessible to the authenticated user:
 ### Flutter usage
 
 Use this endpoint for the landing/home screen after login.
+
+---
+
+## Canonical Item Catalog
+
+### Endpoint List
+
+- `POST /api/v1/catalog/items`
+- `GET /api/v1/catalog/items`
+- `GET /api/v1/catalog/items/{id}`
+
+### Create Canonical Item
+
+```text
+POST /api/v1/catalog/items
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "name": "Milk",
+  "description": "Any 1L milk product"
+}
+```
+
+The backend stores a normalized item name for matching price history against the shared catalog.
+
+---
+
+## User Home Location
+
+### Endpoint List
+
+- `GET /api/v1/users/me/location`
+- `PATCH /api/v1/users/me/location`
+
+### Update Location
+
+```text
+PATCH /api/v1/users/me/location
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "latitude": 32.99,
+  "longitude": -96.70
+}
+```
+
+Use this to persist the authenticated user's home location for future defaults and nearby-store related features.
+
+---
+
+## Price Summary View
+
+### Endpoint
+
+```text
+GET /api/v1/prices/best-prices
+Authorization: Bearer <token>
+```
+
+### Behavior
+
+Returns one row per canonical item the authenticated user has captured.
+Each row includes the canonical item id, display name, lowest recorded price, and the store where that lowest price was observed.
+
+Rows without a canonical item are excluded.
 
 ---
 
