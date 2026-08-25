@@ -1066,7 +1066,7 @@ Common errors:
 
 1. 400 Bad Request (validation or invalid price/item)
 2. 403 Forbidden (missing/invalid/expired token)
-3. 404 Not Found (store not found)
+3. 404 Not Found (captureId not found, or canonicalItemId not found when provided)
 4. 401 Unauthorized (missing or invalid auth)
 
 ---
@@ -1137,6 +1137,21 @@ Behavior:
 ```text
 GET /api/v1/prices/best-store/{canonicalItemId}
 Authorization: Bearer <token>
+```
+
+Response:
+
+1. Status: 200 OK
+2. Body: array of StorePriceResponse
+
+```json
+[
+  {
+    "storeId": "77777777-7777-7777-7777-777777777777",
+    "storeName": "Walmart",
+    "price": 3.49
+  }
+]
 ```
 
 Behavior:
@@ -1359,6 +1374,16 @@ Common errors:
   "source": "string",
   "createdBy": "uuid",
   "createdAt": "ISO local datetime"
+}
+```
+
+### StorePriceResponse
+
+```json
+{
+  "storeId": "uuid",
+  "storeName": "string",
+  "price": "decimal"
 }
 ```
 
