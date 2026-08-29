@@ -23,8 +23,10 @@ Base URL:
 Public endpoints:
 
 1. POST /api/v1/auth/register
-2. POST /api/v1/auth/login
-3. GET /api/v1/invites/{token}
+2. GET /api/v1/auth/verify-email?token=<token>
+3. POST /api/v1/auth/resend-verification
+4. POST /api/v1/auth/login
+5. GET /api/v1/invites/{token}
 
 Protected endpoints:
 
@@ -118,11 +120,9 @@ Success:
 
 ```json
 {
-  "token": "eyJ...",
-  "tokenType": "Bearer",
-  "userId": "11111111-1111-1111-1111-111111111111",
+  "message": "Registration successful. Please check your email to verify your account.",
   "email": "paul@example.com",
-  "name": "Paul"
+  "emailVerified": false
 }
 ```
 
@@ -133,7 +133,82 @@ Common errors:
 
 ---
 
-## 2) Login
+## 2) Verify Email
+
+Endpoint:
+
+GET /api/v1/auth/verify-email?token={token}
+
+Auth:
+
+No
+
+Query params:
+
+1. token: required verification token from email link
+
+Request body:
+
+None
+
+Success:
+
+1. Status: 200 OK
+2. Body:
+
+```json
+{
+  "message": "Email verified successfully. You can now log in.",
+  "email": "paul@example.com",
+  "emailVerified": true
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (missing/invalid token)
+2. 409 Conflict (token expired)
+
+---
+
+## 3) Resend Verification Email
+
+Endpoint:
+
+POST /api/v1/auth/resend-verification
+
+Auth:
+
+No
+
+Request body:
+
+```json
+{
+  "email": "paul@example.com"
+}
+```
+
+Success:
+
+1. Status: 200 OK
+2. Body:
+
+```json
+{
+  "message": "Verification email sent. Please check your inbox.",
+  "email": "paul@example.com",
+  "emailVerified": false
+}
+```
+
+Common errors:
+
+1. 400 Bad Request (validation/email not found)
+
+---
+
+## 4) Login
 
 Endpoint:
 
@@ -176,10 +251,11 @@ Common errors:
 
 1. 400 Bad Request (validation)
 2. 401 Unauthorized (invalid email or password)
+3. 409 Conflict (email not verified)
 
 ---
 
-## 3) Get My Lists
+## 5) Get My Lists
 
 Endpoint:
 
@@ -223,7 +299,7 @@ Common errors:
 
 ---
 
-## 4) Create List
+## 6) Create List
 
 Endpoint:
 
@@ -1233,6 +1309,26 @@ Common errors:
 ---
 
 ## Shared Response Models
+
+### RegisterResponse
+
+```json
+{
+  "message": "Registration successful. Please check your email to verify your account.",
+  "email": "string",
+  "emailVerified": false
+}
+```
+
+### VerifyEmailResponse
+
+```json
+{
+  "message": "Email verified successfully. You can now log in.",
+  "email": "string",
+  "emailVerified": true
+}
+```
 
 ### AuthResponse
 

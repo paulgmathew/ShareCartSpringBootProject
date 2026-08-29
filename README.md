@@ -7,8 +7,10 @@ It provides JWT-based authentication, collaborative shopping lists, member invit
 
 Current capabilities:
 
-- Register a user
-- Log in and receive a JWT token
+- Register a user and send verification email
+- Verify email before first login
+- Resend verification email
+- Log in and receive a JWT token (verified accounts only)
 - Load all lists for the logged-in user
 - Create shopping lists
 - Fetch list details by id
@@ -160,6 +162,8 @@ Base API path:
 Public endpoints:
 
 - `POST /api/v1/auth/register`
+- `GET /api/v1/auth/verify-email?token={token}`
+- `POST /api/v1/auth/resend-verification`
 - `POST /api/v1/auth/login`
 
 All other endpoints require this header, except invite preview (`GET /api/v1/invites/{token}`):
@@ -170,10 +174,11 @@ Authorization: Bearer <token>
 
 Typical flow:
 
-1. Register or log in
-2. Store the returned JWT token
-3. Send the token on every protected request
-4. Use `GET /api/v1/lists/me` as the landing-page endpoint
+1. Register with email and password
+2. Open the verification link received by email
+3. Log in after verification and store the returned JWT token
+4. Send the token on every protected request
+5. Use `GET /api/v1/lists/me` as the landing-page endpoint
 
 ## Quick Start API Examples
 
@@ -197,6 +202,22 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{
     "email": "paul@example.com",
     "password": "password123"
+  }'
+```
+
+### Verify Email
+
+```bash
+curl "http://localhost:8080/api/v1/auth/verify-email?token=<verificationToken>"
+```
+
+### Resend Verification Email
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-verification \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "paul@example.com"
   }'
 ```
 
@@ -295,6 +316,8 @@ curl "http://localhost:8080/api/v1/stores/nearby?lat=37.7749&lon=-122.4194" \
 ### Auth
 
 - `POST /api/v1/auth/register`
+- `GET /api/v1/auth/verify-email?token={token}`
+- `POST /api/v1/auth/resend-verification`
 - `POST /api/v1/auth/login`
 
 ### Shopping Lists
@@ -366,3 +389,4 @@ Detailed docs:
 - Local datasource credentials in `application-dev.properties` are for development only
 - SQL logging is enabled in dev (`spring.jpa.show-sql=true`) and disabled in prod
 - Application-level logs use DEBUG level for `com.sharecart` in dev and INFO in prod
+- Email verification mail is sent through Mailtrap Email API using `MAILTRAP_API_TOKEN`
