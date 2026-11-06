@@ -381,6 +381,7 @@ Detailed docs:
 - `docs/refactor-ai-priceconfirm.md`
 - `docs/sharecart-ai-api-overview.md`
 - `docs/sharecart-ai-jwt-authentication-guide.md`
+- `docs/project-progress-tracker.md`
 
 ## Development Notes
 
