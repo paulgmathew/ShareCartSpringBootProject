@@ -2,6 +2,19 @@
 
 ## Current API Endpoints
 
+### Auth (Email Verification Flow)
+
+- `POST /api/v1/auth/register`
+- `GET /api/v1/auth/verify-email?token={token}`
+- `POST /api/v1/auth/resend-verification`
+- `POST /api/v1/auth/login`
+
+Flow notes:
+
+- Register creates the account in unverified state and sends a verification email.
+- Verify endpoint marks the account as verified.
+- Login returns JWT only for verified accounts.
+
 ### Catalog
 
 - `POST /api/v1/catalog/items`
